@@ -18,12 +18,20 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
   const [manualError, setManualError] = useState('');
   const resultTimeoutRef = useRef<number | null>(null);
 
+  const selectedEvent = events.find(e => e.id === selectedEventId);
+
   useEffect(() => {
+    // Si el evento seleccionado (posiblemente desde localStorage) ya no existe, límpialo.
+    if (!isLoading && selectedEventId && !selectedEvent) {
+      selectEvent(null);
+      return;
+    }
+
     // Si solo hay un evento disponible y ninguno está seleccionado, lo selecciona automáticamente.
     if (!isLoading && !selectedEventId && events.length === 1) {
       selectEvent(events[0].id);
     }
-  }, [isLoading, events, selectedEventId, selectEvent]);
+  }, [isLoading, events, selectedEventId, selectEvent, selectedEvent]);
 
   const clearResult = useCallback(() => {
     setResult(null);
@@ -37,43 +45,34 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
     };
   }, []);
 
-  const handleScan = useCallback((decodedText: string | null, error: unknown | null) => {
+  const handleScan = useCallback((decodedText: string) => {
     if (resultTimeoutRef.current) {
       clearTimeout(resultTimeoutRef.current);
     }
 
-    if (decodedText) {
-      let checkInResult: CheckInResult;
-      try {
-        const qrData = JSON.parse(decodedText);
-        if (qrData.id) {
-          const guest = guests.find(g => g.id === qrData.id.toUpperCase().trim());
-          if (guest && guest.eventId !== selectedEventId) {
-             const guestEvent = events.find(e => e.id === guest.eventId);
-             checkInResult = {
-                 status: 'NOT_FOUND',
-                 guest: { ...guest, company: `Evento: ${guestEvent?.name || 'Otro'}` } as Guest
-             };
-          } else {
-            checkInResult = checkInGuest(qrData.id);
-          }
+    let checkInResult: CheckInResult;
+    try {
+      const qrData = JSON.parse(decodedText);
+      if (qrData.id) {
+        const guest = guests.find(g => g.id === qrData.id.toUpperCase().trim());
+        if (guest && guest.eventId !== selectedEventId) {
+           const guestEvent = events.find(e => e.id === guest.eventId);
+           checkInResult = {
+               status: 'NOT_FOUND',
+               guest: { ...guest, company: `Evento: ${guestEvent?.name || 'Otro'}` } as Guest
+           };
         } else {
-          checkInResult = { status: 'NOT_FOUND', guest: null };
+          checkInResult = checkInGuest(qrData.id);
         }
-      } catch (e) {
-        console.error("Invalid QR code format", e);
+      } else {
         checkInResult = { status: 'NOT_FOUND', guest: null };
       }
-      setResult(checkInResult);
-      resultTimeoutRef.current = window.setTimeout(clearResult, 5000);
+    } catch (e) {
+      console.error("Invalid QR code format", e);
+      checkInResult = { status: 'NOT_FOUND', guest: null };
     }
-    
-    if (error) {
-      // Don't show an error for normal scanning operation, only log it.
-      if (error instanceof Error) {
-        console.info(error.message);
-      }
-    }
+    setResult(checkInResult);
+    resultTimeoutRef.current = window.setTimeout(clearResult, 5000);
   }, [checkInGuest, clearResult, guests, selectedEventId, events]);
 
   const handleManualSubmit = (e: React.FormEvent) => {
@@ -106,8 +105,6 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
     resultTimeoutRef.current = window.setTimeout(clearResult, 5000);
   };
   
-  const selectedEvent = events.find(e => e.id === selectedEventId);
-
   const renderResult = () => {
     if (!result) return null;
 
@@ -199,10 +196,10 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
 
   return (
     <div className="relative h-screen w-screen bg-black overflow-hidden">
-      {/* FIX: The 'onDecode' prop is not available in this version of the scanner library. Using 'onResult' which passes a result object with a getText() method. */}
+      {/* FIX: Corrected scanner props for the library version. Replaced 'onDecode' with 'onResult' which passes a result object. Also fixed the type of 'error' for logging. */}
       <Scanner
-        onResult={(result) => handleScan(result.getText(), null)}
-        onError={(error) => handleScan(null, error)}
+        onResult={(result: any) => result && handleScan(result.getText())}
+        onError={(error: any) => console.error(error?.message)}
         containerStyle={{ width: '100%', height: '100%', paddingTop: 0 }}
         videoStyle={{ width: '100%', height: '100%', objectFit: 'cover' }}
       />

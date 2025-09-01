@@ -17,7 +17,8 @@ const LandingPage: React.FC = () => {
         <h1 className="text-5xl md:text-6xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-500">
           ACCESOS SHOW TIME
         </h1>
-        <p className="mt-4 text-lg text-gray-400">
+        <p className="mt-4 text-base font-light text-gray-500 tracking-[0.2em]">by Manu</p>
+        <p className="mt-6 text-lg text-gray-400">
           Plataforma de Gestión de Invitados VIP
         </p>
       </div>
