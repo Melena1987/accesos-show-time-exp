@@ -23,11 +23,8 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [events, setEvents] = useState<Event[]>([]);
   const [guests, setGuests] = useState<Guest[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(() => {
-    // Recupera el ID del evento seleccionado del localStorage para mejorar la experiencia de usuario al recargar.
     return localStorage.getItem('selectedEventId');
   });
-  // Este indicador es crucial. Evita que la aplicación sobrescriba el estado remoto
-  // con su estado inicial vacío antes de que se hayan cargado los datos remotos.
   const [isInitialLoadComplete, setIsInitialLoadComplete] = useState(false);
 
   // Efecto para cargar datos del almacén remoto y sondear actualizaciones.
@@ -57,10 +54,7 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       } catch (error) {
         console.error("Fallo al cargar o analizar datos del almacén remoto. Se reintentará.", error);
       } finally {
-        // CORRECCIÓN CLAVE: Nos aseguramos de que la carga inicial se marque como completa
-        // incluso si falla, para que la aplicación pueda empezar a GUARDAR nuevos datos.
-        // Sin esto, si la carga inicial falla (p. ej., el almacén está vacío), no se guardará nada.
-        if (isMounted && !isInitialLoadComplete) {
+        if (isMounted) {
             setIsInitialLoadComplete(true);
         }
       }
@@ -73,34 +67,7 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         isMounted = false;
         clearInterval(intervalId);
     };
-  // Se deshabilita la regla del linter porque controlamos intencionadamente la ejecución de este efecto
-  // para que se ejecute solo una vez, manejando 'isInitialLoadComplete' internamente.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Efecto para guardar los datos en el almacén remoto cada vez que cambian.
-  useEffect(() => {
-    // No guardar datos hasta que el intento de carga inicial se haya completado.
-    if (!isInitialLoadComplete) {
-      return;
-    }
-
-    const saveData = async () => {
-      try {
-        await fetch(DATA_STORAGE_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ events, guests }),
-        });
-      } catch (error) {
-        console.error("Fallo al guardar datos en el almacén remoto:", error);
-      }
-    };
-
-    saveData();
-  }, [events, guests, isInitialLoadComplete]);
   
   // Efecto para persistir el evento seleccionado en localStorage.
   useEffect(() => {
@@ -110,6 +77,25 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       localStorage.removeItem('selectedEventId');
     }
   }, [selectedEventId]);
+
+  const saveData = async (updatedEvents: Event[], updatedGuests: Guest[]) => {
+    if (!isInitialLoadComplete) {
+      // Previene el guardado antes de que la carga inicial se complete para evitar sobrescribir.
+      console.warn("Se impidió el guardado porque la carga inicial no está completa.");
+      return;
+    }
+    try {
+      await fetch(DATA_STORAGE_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ events: updatedEvents, guests: updatedGuests }),
+      });
+    } catch (error) {
+      console.error("Fallo al guardar datos en el almacén remoto:", error);
+    }
+  };
 
   const generateShortId = (existingIds: string[]): string => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -128,8 +114,10 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       id: `evt_${new Date().getTime()}`,
       name,
     };
-    setEvents(prevEvents => [...prevEvents, newEvent]);
+    const updatedEvents = [...events, newEvent];
+    setEvents(updatedEvents);
     setSelectedEventId(newEvent.id);
+    saveData(updatedEvents, guests); // Guardado inmediato
   };
 
   const selectEvent = (eventId: string | null) => {
@@ -137,51 +125,42 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   };
 
   const addGuest = (name: string, company: string, accessLevel: AccessLevel, eventId: string, invitedBy: string) => {
-    setGuests(prevGuests => {
-      const newGuest: Guest = {
-        id: generateShortId(prevGuests.map(g => g.id)),
-        eventId,
-        name,
-        company,
-        accessLevel,
-        checkedInAt: null,
-        invitedBy,
-      };
-      return [...prevGuests, newGuest];
-    });
+    const newGuest: Guest = {
+      id: generateShortId(guests.map(g => g.id)),
+      eventId,
+      name,
+      company,
+      accessLevel,
+      checkedInAt: null,
+      invitedBy,
+    };
+    const updatedGuests = [...guests, newGuest];
+    setGuests(updatedGuests);
+    saveData(events, updatedGuests); // Guardado inmediato
   };
 
   const checkInGuest = (guestId: string): CheckInResult => {
     const normalizedGuestId = guestId.toUpperCase().trim();
-    let result: CheckInResult | null = null;
+    const guestIndex = guests.findIndex(g => g.id === normalizedGuestId);
+
+    if (guestIndex === -1) {
+        return { status: 'NOT_FOUND', guest: null };
+    }
+
+    const guest = guests[guestIndex];
+
+    if (guest.checkedInAt) {
+        return { status: 'ALREADY_CHECKED_IN', guest };
+    }
+
+    const updatedGuests = [...guests];
+    const updatedGuest = { ...guest, checkedInAt: new Date() };
+    updatedGuests[guestIndex] = updatedGuest;
     
-    setGuests(currentGuests => {
-        const guestIndex = currentGuests.findIndex(g => g.id === normalizedGuestId);
+    setGuests(updatedGuests);
+    saveData(events, updatedGuests); // Guardado inmediato
 
-        if (guestIndex === -1) {
-            result = { status: 'NOT_FOUND', guest: null };
-            return currentGuests;
-        }
-
-        const guest = currentGuests[guestIndex];
-
-        if (guest.checkedInAt) {
-            result = { status: 'ALREADY_CHECKED_IN', guest };
-            return currentGuests;
-        }
-
-        const updatedGuests = [...currentGuests];
-        const updatedGuest = { ...guest, checkedInAt: new Date() };
-        updatedGuests[guestIndex] = updatedGuest;
-        
-        result = { status: 'SUCCESS', guest: updatedGuest };
-        return updatedGuests;
-    });
-
-    // La actualización de estado es asíncrona, pero la función debe devolver un resultado.
-    // Capturamos el resultado dentro del actualizador y lo devolvemos.
-    // La llamada a `setGuests` activará el efecto de guardado.
-    return result!;
+    return { status: 'SUCCESS', guest: updatedGuest };
   };
 
 
