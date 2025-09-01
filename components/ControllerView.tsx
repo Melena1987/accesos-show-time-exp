@@ -29,7 +29,8 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
     };
   }, []);
 
-  const handleScan = useCallback((decodedText: string | null, error: Error | null) => {
+  // FIX: Changed the type of 'error' from 'Error | null' to 'unknown' to correctly handle the error type from the scanner's onError prop.
+  const handleScan = useCallback((decodedText: string | null, error: unknown | null) => {
     if (resultTimeoutRef.current) {
       clearTimeout(resultTimeoutRef.current);
     }
@@ -62,7 +63,10 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
     
     if (error) {
       // Don't show an error for normal scanning operation, only log it.
-      console.info(error.message);
+      // FIX: Added a type check to safely access the 'message' property from the error object.
+      if (error instanceof Error) {
+        console.info(error.message);
+      }
     }
   }, [checkInGuest, clearResult, guests, selectedEventId, events]);
 
@@ -181,7 +185,9 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
   return (
     <div className="relative h-screen w-screen bg-black overflow-hidden">
       <Scanner
-        onDecode={(result) => handleScan(result, null)}
+        // FIX: The 'onDecode' prop does not exist on the installed version of the scanner library.
+        // It has been replaced with 'onResult', and the callback has been updated to handle the result object.
+        onResult={(result) => handleScan(result.getText(), null)}
         onError={(error) => handleScan(null, error)}
         containerStyle={{ width: '100%', height: '100%', paddingTop: 0 }}
         videoStyle={{ width: '100%', height: '100%', objectFit: 'cover' }}
