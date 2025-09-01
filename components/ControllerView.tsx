@@ -18,6 +18,13 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
   const [manualError, setManualError] = useState('');
   const resultTimeoutRef = useRef<number | null>(null);
 
+  useEffect(() => {
+    // Si solo hay un evento disponible y ninguno está seleccionado, lo selecciona automáticamente.
+    if (!isLoading && !selectedEventId && events.length === 1) {
+      selectEvent(events[0].id);
+    }
+  }, [isLoading, events, selectedEventId, selectEvent]);
+
   const clearResult = useCallback(() => {
     setResult(null);
   }, []);
@@ -154,7 +161,7 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
   if (isLoading) {
     return (
         <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-            <p className="text-xl">Cargando evento...</p>
+            <p className="text-xl">Cargando eventos...</p>
         </div>
     );
   }
@@ -192,9 +199,9 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
 
   return (
     <div className="relative h-screen w-screen bg-black overflow-hidden">
-      {/* FIX: The 'onResult' prop is not available in this version of the scanner library. Using 'onDecode' instead, which passes the scanned text string directly. */}
+      {/* FIX: The 'onDecode' prop is not available in this version of the scanner library. Using 'onResult' which passes a result object with a getText() method. */}
       <Scanner
-        onDecode={(result) => handleScan(result, null)}
+        onResult={(result) => handleScan(result.getText(), null)}
         onError={(error) => handleScan(null, error)}
         containerStyle={{ width: '100%', height: '100%', paddingTop: 0 }}
         videoStyle={{ width: '100%', height: '100%', objectFit: 'cover' }}
