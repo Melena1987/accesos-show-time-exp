@@ -8,7 +8,7 @@ interface AdminDashboardProps {
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
-  const { events, guests } = useGuests();
+  const { events, guests, isLoading } = useGuests();
 
   const handleExportToCSV = (event: Event, eventGuests: Guest[]) => {
     // 1. Change header to avoid SYLK error
@@ -39,6 +39,25 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     link.click();
     document.body.removeChild(link);
   };
+
+  if (isLoading) {
+    return (
+        <div className="min-h-screen bg-gray-900 p-4 md:p-8">
+            <header className="flex justify-between items-center mb-8">
+                <h1 className="text-3xl font-bold">Panel de Administración</h1>
+                 <button 
+                  onClick={onLogout} 
+                  className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md transition duration-300"
+                >
+                  Cerrar Sesión
+                </button>
+            </header>
+            <div className="text-center bg-gray-800 p-10 rounded-lg">
+                <h2 className="text-xl font-semibold text-gray-300">Cargando datos...</h2>
+            </div>
+        </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-900 p-4 md:p-8">

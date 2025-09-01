@@ -5,6 +5,7 @@ interface GuestContextType {
   events: Event[];
   guests: Guest[];
   selectedEventId: string | null;
+  isLoading: boolean;
   addEvent: (name: string) => void;
   selectEvent: (eventId: string | null) => void;
   addGuest: (name: string, company: string, accessLevel: AccessLevel, eventId: string, invitedBy: string) => void;
@@ -25,16 +26,14 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [selectedEventId, setSelectedEventId] = useState<string | null>(() => {
     return localStorage.getItem('selectedEventId');
   });
-  const [isInitialLoadComplete, setIsInitialLoadComplete] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Efecto para cargar datos del almacén remoto y sondear actualizaciones.
+  // Efecto para cargar los datos iniciales del almacén remoto.
   useEffect(() => {
-    let isMounted = true;
-
     const loadData = async () => {
       try {
         const response = await fetch(DATA_STORAGE_URL, { cache: 'no-store' });
-        if (!response.ok || !isMounted) return;
+        if (!response.ok) return;
         
         const storedData = await response.json();
 
@@ -52,23 +51,39 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             setGuests(parsedGuests);
         }
       } catch (error) {
-        console.error("Fallo al cargar o analizar datos del almacén remoto. Se reintentará.", error);
+        console.error("Fallo al cargar datos del almacén remoto. Se continuará con el estado vacío.", error);
       } finally {
-        if (isMounted) {
-            setIsInitialLoadComplete(true);
-        }
+        setIsLoading(false);
       }
     };
     
-    loadData(); // Carga inicial
-    const intervalId = setInterval(loadData, 5000); // Sondear actualizaciones cada 5 segundos
-
-    return () => {
-        isMounted = false;
-        clearInterval(intervalId);
-    };
+    loadData();
   }, []);
   
+  // Efecto para persistir los datos en el almacén remoto CADA VEZ que cambien.
+  // Este efecto solo se ejecuta después de que la carga inicial haya terminado (isLoading es false).
+  useEffect(() => {
+    if (isLoading) {
+      return; // No guardar nada mientras se cargan los datos iniciales.
+    }
+
+    const saveData = async () => {
+      try {
+        await fetch(DATA_STORAGE_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ events, guests }),
+        });
+      } catch (error) {
+        console.error("Fallo al guardar datos en el almacén remoto:", error);
+      }
+    };
+
+    saveData();
+  }, [events, guests, isLoading]);
+
   // Efecto para persistir el evento seleccionado en localStorage.
   useEffect(() => {
     if (selectedEventId) {
@@ -77,25 +92,6 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       localStorage.removeItem('selectedEventId');
     }
   }, [selectedEventId]);
-
-  const saveData = async (updatedEvents: Event[], updatedGuests: Guest[]) => {
-    if (!isInitialLoadComplete) {
-      // Previene el guardado antes de que la carga inicial se complete para evitar sobrescribir.
-      console.warn("Se impidió el guardado porque la carga inicial no está completa.");
-      return;
-    }
-    try {
-      await fetch(DATA_STORAGE_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ events: updatedEvents, guests: updatedGuests }),
-      });
-    } catch (error) {
-      console.error("Fallo al guardar datos en el almacén remoto:", error);
-    }
-  };
 
   const generateShortId = (existingIds: string[]): string => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -114,10 +110,8 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       id: `evt_${new Date().getTime()}`,
       name,
     };
-    const updatedEvents = [...events, newEvent];
-    setEvents(updatedEvents);
+    setEvents(currentEvents => [...currentEvents, newEvent]);
     setSelectedEventId(newEvent.id);
-    saveData(updatedEvents, guests); // Guardado inmediato
   };
 
   const selectEvent = (eventId: string | null) => {
@@ -134,38 +128,37 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       checkedInAt: null,
       invitedBy,
     };
-    const updatedGuests = [...guests, newGuest];
-    setGuests(updatedGuests);
-    saveData(events, updatedGuests); // Guardado inmediato
+    setGuests(currentGuests => [...currentGuests, newGuest]);
   };
 
   const checkInGuest = (guestId: string): CheckInResult => {
     const normalizedGuestId = guestId.toUpperCase().trim();
-    const guestIndex = guests.findIndex(g => g.id === normalizedGuestId);
+    const guest = guests.find(g => g.id === normalizedGuestId);
 
-    if (guestIndex === -1) {
+    if (!guest) {
         return { status: 'NOT_FOUND', guest: null };
     }
-
-    const guest = guests[guestIndex];
 
     if (guest.checkedInAt) {
         return { status: 'ALREADY_CHECKED_IN', guest };
     }
 
-    const updatedGuests = [...guests];
     const updatedGuest = { ...guest, checkedInAt: new Date() };
-    updatedGuests[guestIndex] = updatedGuest;
     
-    setGuests(updatedGuests);
-    saveData(events, updatedGuests); // Guardado inmediato
+    setGuests(currentGuests => {
+      const guestIndex = currentGuests.findIndex(g => g.id === normalizedGuestId);
+      if (guestIndex === -1) return currentGuests; // No debería ocurrir
+      const updatedGuests = [...currentGuests];
+      updatedGuests[guestIndex] = updatedGuest;
+      return updatedGuests;
+    });
 
     return { status: 'SUCCESS', guest: updatedGuest };
   };
 
 
   return (
-    <GuestContext.Provider value={{ events, guests, selectedEventId, addEvent, selectEvent, addGuest, checkInGuest }}>
+    <GuestContext.Provider value={{ events, guests, selectedEventId, isLoading, addEvent, selectEvent, addGuest, checkInGuest }}>
       {children}
     </GuestContext.Provider>
   );

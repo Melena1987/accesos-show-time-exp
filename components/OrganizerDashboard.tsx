@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { toPng } from 'html-to-image';
 import { useGuests } from '../hooks/useGuests';
@@ -159,7 +158,7 @@ const EventManager: React.FC = () => {
 }
 
 const OrganizerDashboard: React.FC<OrganizerDashboardProps> = ({ onLogout, loggedInUser }) => {
-  const { guests, events, selectedEventId } = useGuests();
+  const { guests, events, selectedEventId, isLoading } = useGuests();
   const invitationRef = useRef<HTMLDivElement>(null);
   const [selectedGuest, setSelectedGuest] = useState<Guest | null>(null);
 
@@ -183,6 +182,26 @@ const OrganizerDashboard: React.FC<OrganizerDashboardProps> = ({ onLogout, logge
   
   const currentGuests = guests.filter(g => g.eventId === selectedEventId);
   const selectedEvent = events.find(e => e.id === selectedEventId);
+
+  if (isLoading) {
+    return (
+        <div className="min-h-screen bg-gray-900 p-4 md:p-8">
+             <header className="flex justify-between items-center mb-8">
+                <div>
+                  <h1 className="text-3xl font-bold">Panel del Organizador</h1>
+                  <p className="text-gray-400">Bienvenido, {loggedInUser}</p>
+                </div>
+                <button onClick={onLogout} className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md transition duration-300">
+                    Cerrar Sesión
+                </button>
+            </header>
+            <div className="text-center bg-gray-800 p-10 rounded-lg">
+                <h2 className="text-xl font-semibold text-gray-300">Cargando datos...</h2>
+                <p className="text-gray-400 mt-2">Por favor, espera un momento.</p>
+            </div>
+        </div>
+    );
+  }
 
   return (
     <>

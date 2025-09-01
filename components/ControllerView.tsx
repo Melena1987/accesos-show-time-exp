@@ -10,7 +10,7 @@ interface ControllerViewProps {
 }
 
 const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
-  const { checkInGuest, guests, events, selectedEventId, selectEvent } = useGuests();
+  const { checkInGuest, guests, events, selectedEventId, selectEvent, isLoading } = useGuests();
   const [result, setResult] = useState<CheckInResult | null>(null);
   const [showManualInput, setShowManualInput] = useState(false);
   const [manualId, setManualId] = useState('');
@@ -149,6 +149,14 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
       </div>
     );
   };
+
+  if (isLoading) {
+    return (
+        <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+            <p className="text-xl">Cargando evento...</p>
+        </div>
+    );
+  }
   
   if (!selectedEventId) {
     return (
