@@ -182,9 +182,9 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
 
   return (
     <div className="relative h-screen w-screen bg-black overflow-hidden">
-      {/* FIX: The 'onDecode' prop does not exist on the Scanner component. Changed to `onResult` which is the correct prop for this library version to handle scan results. */}
+      {/* FIX: The 'onResult' prop for the QR Scanner is incorrect. Replaced with 'onDecode', which is the correct prop for the library and returns the scanned text directly. */}
       <Scanner
-        onResult={(result) => handleScan(result, null)}
+        onDecode={(result) => handleScan(result, null)}
         onError={(error) => handleScan(null, error)}
         containerStyle={{ width: '100%', height: '100%', paddingTop: 0 }}
         videoStyle={{ width: '100%', height: '100%', objectFit: 'cover' }}
