@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useState, useEffect, ReactNode } from 'react';
 import { Guest, AccessLevel, CheckInResult, Event } from '../types';
 
 interface GuestContextType {
@@ -23,30 +23,14 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [events, setEvents] = useState<Event[]>([]);
   const [guests, setGuests] = useState<Guest[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-  // Rastrea si la carga inicial de datos está completa para evitar sobrescribir el estado existente con un estado vacío.
-  const [isDataLoaded, setIsDataLoaded] = useState(false);
+  // Este indicador es crucial. Evita que la aplicación sobrescriba el estado remoto
+  // con su estado inicial vacío antes de que se hayan cargado los datos remotos.
+  const [isInitialLoadComplete, setIsInitialLoadComplete] = useState(false);
 
-  // Función para persistir el estado actual en el almacén remoto
-  const saveData = useCallback(async (currentEvents: Event[], currentGuests: Guest[]) => {
-    // Evita guardar hasta que se hayan cargado los datos iniciales.
-    if (!isDataLoaded) return;
-    try {
-      // npoint.io usa POST para actualizar el contenedor JSON
-      await fetch(DATA_STORAGE_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ events: currentEvents, guests: currentGuests }),
-      });
-    } catch (error) {
-      console.error("Fallo al guardar datos en el almacén remoto:", error);
-    }
-  }, [isDataLoaded]);
-
-  // Efecto para cargar datos del almacén remoto y configurar el sondeo para actualizaciones en tiempo real
+  // Efecto para cargar datos del almacén remoto y sondear actualizaciones.
   useEffect(() => {
     let isMounted = true;
+
     const loadData = async () => {
       try {
         const response = await fetch(DATA_STORAGE_URL, { cache: 'no-store' });
@@ -54,7 +38,6 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         
         const storedData = await response.json();
 
-        // Validación básica de datos
         if (storedData && typeof storedData === 'object') {
             const { events: storedEvents, guests: storedGuests } = storedData;
             
@@ -67,24 +50,53 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             
             setEvents(Array.isArray(storedEvents) ? storedEvents : []);
             setGuests(parsedGuests);
+
+            // Marcar la carga inicial como completa SÓLO después de una carga y análisis exitosos.
+            if (!isInitialLoadComplete) {
+                setIsInitialLoadComplete(true);
+            }
         }
       } catch (error) {
-        console.error("Fallo al cargar o analizar datos del almacén remoto.", error);
-      } finally {
-        if (isMounted) {
-            setIsDataLoaded(true);
-        }
+        console.error("Fallo al cargar o analizar datos del almacén remoto. Se reintentará.", error);
+        // No establecer isInitialLoadComplete como true en caso de error.
       }
     };
     
     loadData(); // Carga inicial
-    const intervalId = setInterval(loadData, 5000); // Sondea para actualizaciones cada 5 segundos
+    const intervalId = setInterval(loadData, 5000); // Sondear actualizaciones cada 5 segundos
 
     return () => {
         isMounted = false;
         clearInterval(intervalId);
     };
+  // Ejecutamos este efecto solo una vez. `isInitialLoadComplete` se omite intencionadamente
+  // del array de dependencias para evitar re-configurar el intervalo.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Efecto para guardar los datos en el almacén remoto cada vez que cambian.
+  useEffect(() => {
+    // Guardar datos solo después de que la carga inicial se haya completado.
+    if (!isInitialLoadComplete) {
+      return;
+    }
+
+    const saveData = async () => {
+      try {
+        await fetch(DATA_STORAGE_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ events, guests }),
+        });
+      } catch (error) {
+        console.error("Fallo al guardar datos en el almacén remoto:", error);
+      }
+    };
+
+    saveData();
+  }, [events, guests, isInitialLoadComplete]);
 
   const generateShortId = (existingIds: string[]): string => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -98,24 +110,20 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     return id;
   };
 
-  const addEvent = useCallback((name: string) => {
+  const addEvent = (name: string) => {
     const newEvent: Event = {
       id: `evt_${new Date().getTime()}`,
       name,
     };
-    setEvents(prevEvents => {
-        const updatedEvents = [...prevEvents, newEvent];
-        saveData(updatedEvents, guests);
-        return updatedEvents;
-    });
+    setEvents(prevEvents => [...prevEvents, newEvent]);
     setSelectedEventId(newEvent.id);
-  }, [guests, saveData]);
+  };
 
-  const selectEvent = useCallback((eventId: string | null) => {
+  const selectEvent = (eventId: string | null) => {
     setSelectedEventId(eventId);
-  }, []);
+  };
 
-  const addGuest = useCallback((name: string, company: string, accessLevel: AccessLevel, eventId: string, invitedBy: string) => {
+  const addGuest = (name: string, company: string, accessLevel: AccessLevel, eventId: string, invitedBy: string) => {
     setGuests(prevGuests => {
       const newGuest: Guest = {
         id: generateShortId(prevGuests.map(g => g.id)),
@@ -126,35 +134,43 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         checkedInAt: null,
         invitedBy,
       };
-      const updatedGuests = [...prevGuests, newGuest];
-      saveData(events, updatedGuests);
-      return updatedGuests;
+      return [...prevGuests, newGuest];
     });
-  }, [events, saveData]);
+  };
 
-  const checkInGuest = useCallback((guestId: string): CheckInResult => {
+  const checkInGuest = (guestId: string): CheckInResult => {
     const normalizedGuestId = guestId.toUpperCase().trim();
-    const guestIndex = guests.findIndex(g => g.id === normalizedGuestId);
-
-    if (guestIndex === -1) {
-      return { status: 'NOT_FOUND', guest: null };
-    }
-
-    const guest = guests[guestIndex];
-
-    if (guest.checkedInAt) {
-      return { status: 'ALREADY_CHECKED_IN', guest };
-    }
-
-    const updatedGuests = [...guests];
-    const updatedGuest = { ...guest, checkedInAt: new Date() };
-    updatedGuests[guestIndex] = updatedGuest;
+    let result: CheckInResult | null = null;
     
-    setGuests(updatedGuests);
-    saveData(events, updatedGuests);
-    
-    return { status: 'SUCCESS', guest: updatedGuest };
-}, [guests, events, saveData]);
+    setGuests(currentGuests => {
+        const guestIndex = currentGuests.findIndex(g => g.id === normalizedGuestId);
+
+        if (guestIndex === -1) {
+            result = { status: 'NOT_FOUND', guest: null };
+            return currentGuests;
+        }
+
+        const guest = currentGuests[guestIndex];
+
+        if (guest.checkedInAt) {
+            result = { status: 'ALREADY_CHECKED_IN', guest };
+            return currentGuests;
+        }
+
+        const updatedGuests = [...currentGuests];
+        const updatedGuest = { ...guest, checkedInAt: new Date() };
+        updatedGuests[guestIndex] = updatedGuest;
+        
+        result = { status: 'SUCCESS', guest: updatedGuest };
+        return updatedGuests;
+    });
+
+    // La actualización de estado es asíncrona, pero la función debe devolver un resultado.
+    // Capturamos el resultado dentro del actualizador y lo devolvemos.
+    // La llamada a `setGuests` activará el efecto de guardado.
+    return result!;
+  };
+
 
   return (
     <GuestContext.Provider value={{ events, guests, selectedEventId, addEvent, selectEvent, addGuest, checkInGuest }}>

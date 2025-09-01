@@ -182,9 +182,9 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
 
   return (
     <div className="relative h-screen w-screen bg-black overflow-hidden">
-      {/* FIX: The 'onDecode' prop is not valid for this component. It has been replaced with 'onResult', which correctly handles the scan result by passing the decoded text as a string. */}
+      {/* FIX: The 'onResult' prop is not valid for this component. It has been replaced with 'onDecode', which correctly handles the scan result by passing the decoded text as a string. */}
       <Scanner
-        onResult={(result) => handleScan(result, null)}
+        onDecode={(result) => handleScan(result, null)}
         onError={(error) => handleScan(null, error)}
         containerStyle={{ width: '100%', height: '100%', paddingTop: 0 }}
         videoStyle={{ width: '100%', height: '100%', objectFit: 'cover' }}
