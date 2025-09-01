@@ -132,6 +132,11 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
             </div>
             {renderForm()}
         </div>
+        <div className="text-center">
+          <Link to="/" className="font-medium text-indigo-400 hover:text-indigo-300 transition-colors">
+            ← Volver a la página principal
+          </Link>
+        </div>
       </div>
       <Link to="/admin/login" className="absolute bottom-4 right-4 text-xs text-gray-500 hover:text-gray-300 transition-colors">
         Acceso Admin

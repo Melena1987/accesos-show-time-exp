@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { UserRole } from '../types';
 
 interface AdminLoginPageProps {
@@ -93,6 +93,12 @@ const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onLogin }) => {
               </button>
             </div>
           </form>
+        </div>
+
+        <div className="text-center">
+          <Link to="/" className="font-medium text-indigo-400 hover:text-indigo-300 transition-colors">
+            ← Volver a la página principal
+          </Link>
         </div>
       </div>
     </div>
