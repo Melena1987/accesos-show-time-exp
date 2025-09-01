@@ -182,7 +182,7 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
 
   return (
     <div className="relative h-screen w-screen bg-black overflow-hidden">
-      {/* FIX: The prop 'onResult' is not available on the Scanner component. It has been replaced with 'onDecode' which provides the scanned text as a string, matching the 'handleScan' function's expectation. The handler was updated accordingly. */}
+      {/* FIX: The 'onResult' prop is not available in the installed version of the scanner library. Switched to 'onDecode' which is supported and passes the decoded text as a string to resolve the TypeScript error. */}
       <Scanner
         onDecode={(result) => handleScan(result, null)}
         onError={(error) => handleScan(null, error)}
