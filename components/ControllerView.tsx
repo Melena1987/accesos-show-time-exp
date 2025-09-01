@@ -182,7 +182,7 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
 
   return (
     <div className="relative h-screen w-screen bg-black overflow-hidden">
-      {/* FIX: The 'onResult' prop is not available in the installed version of the scanner library. Switched to 'onDecode' which is supported and passes the decoded text as a string to resolve the TypeScript error. */}
+      {/* FIX: The `onResult` prop is not valid for this version of `@yudiel/react-qr-scanner`. The correct prop is `onDecode`, which passes the scanned text as a string. */}
       <Scanner
         onDecode={(result) => handleScan(result, null)}
         onError={(error) => handleScan(null, error)}
