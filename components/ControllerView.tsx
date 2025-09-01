@@ -1,8 +1,7 @@
-
-import React, { useState, useCallback, useRef } from 'react';
-import { QrReader } from 'react-qr-reader';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { Scanner } from '@yudiel/react-qr-scanner';
 import { useGuests } from '../hooks/useGuests';
-import { CheckInResult } from '../types';
+import { CheckInResult, Guest } from '../types';
 import CheckIcon from './icons/CheckIcon';
 import WarningIcon from './icons/WarningIcon';
 
@@ -10,184 +9,246 @@ interface ControllerViewProps {
   onLogout: () => void;
 }
 
-const ScanResultModal: React.FC<{ result: CheckInResult; onClose: () => void }> = ({ result, onClose }) => {
-  if (!result.guest) {
+const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
+  const { checkInGuest, guests, events, selectedEventId, selectEvent } = useGuests();
+  const [result, setResult] = useState<CheckInResult | null>(null);
+  const [showManualInput, setShowManualInput] = useState(false);
+  const [manualId, setManualId] = useState('');
+  const [manualError, setManualError] = useState('');
+  const resultTimeoutRef = useRef<number | null>(null);
+
+  const clearResult = useCallback(() => {
+    setResult(null);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (resultTimeoutRef.current) {
+        clearTimeout(resultTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleScan = useCallback((decodedText: string | null, error: Error | null) => {
+    if (resultTimeoutRef.current) {
+      clearTimeout(resultTimeoutRef.current);
+    }
+
+    if (decodedText) {
+      let checkInResult: CheckInResult;
+      try {
+        const qrData = JSON.parse(decodedText);
+        if (qrData.id) {
+          const guest = guests.find(g => g.id === qrData.id.toUpperCase().trim());
+          if (guest && guest.eventId !== selectedEventId) {
+             const guestEvent = events.find(e => e.id === guest.eventId);
+             checkInResult = {
+                 status: 'NOT_FOUND',
+                 guest: { ...guest, company: `Evento: ${guestEvent?.name || 'Otro'}` } as Guest
+             };
+          } else {
+            checkInResult = checkInGuest(qrData.id);
+          }
+        } else {
+          checkInResult = { status: 'NOT_FOUND', guest: null };
+        }
+      } catch (e) {
+        console.error("Invalid QR code format", e);
+        checkInResult = { status: 'NOT_FOUND', guest: null };
+      }
+      setResult(checkInResult);
+      resultTimeoutRef.current = window.setTimeout(clearResult, 5000);
+    }
+    
+    if (error) {
+      // Don't show an error for normal scanning operation, only log it.
+      console.info(error.message);
+    }
+  }, [checkInGuest, clearResult, guests, selectedEventId, events]);
+
+  const handleManualSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setManualError('');
+    if (!manualId.trim()) {
+      setManualError('El ID no puede estar vacío.');
+      return;
+    }
+
+    if (resultTimeoutRef.current) {
+      clearTimeout(resultTimeoutRef.current);
+    }
+    
+    let checkInResult: CheckInResult;
+    const guest = guests.find(g => g.id === manualId.toUpperCase().trim());
+    if (guest && guest.eventId !== selectedEventId) {
+       const guestEvent = events.find(e => e.id === guest.eventId);
+       checkInResult = {
+           status: 'NOT_FOUND',
+           guest: { ...guest, company: `Evento: ${guestEvent?.name || 'Otro'}` } as Guest
+       };
+    } else {
+      checkInResult = checkInGuest(manualId);
+    }
+    
+    setResult(checkInResult);
+    setManualId('');
+    setShowManualInput(false);
+    resultTimeoutRef.current = window.setTimeout(clearResult, 5000);
+  };
+  
+  const selectedEvent = events.find(e => e.id === selectedEventId);
+
+  const renderResult = () => {
+    if (!result) return null;
+
+    let bgColor, Icon, title, guestName, guestDetails;
+
+    switch (result.status) {
+      case 'SUCCESS':
+        bgColor = 'bg-green-500/90';
+        Icon = CheckIcon;
+        title = 'Acceso Permitido';
+        guestName = result.guest?.name;
+        guestDetails = `Nivel ${result.guest?.accessLevel} - ${result.guest?.company}`;
+        break;
+      case 'ALREADY_CHECKED_IN':
+        bgColor = 'bg-yellow-500/90';
+        Icon = WarningIcon;
+        title = 'Invitado Ya Admitido';
+        guestName = result.guest?.name;
+        guestDetails = `Admitido a las ${result.guest?.checkedInAt?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+        break;
+      case 'NOT_FOUND':
+      default:
+        bgColor = 'bg-red-500/90';
+        Icon = WarningIcon;
+        title = 'Acceso Denegado';
+        guestName = result.guest?.name || 'Invitado no encontrado';
+        guestDetails = result.guest?.company || 'Verifica el código o ID.';
+        break;
+    }
+
     return (
-       <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" onClick={onClose}>
-        <div className="bg-red-800 text-white p-8 rounded-lg shadow-xl text-center max-w-sm mx-4">
-          <WarningIcon className="w-16 h-16 mx-auto text-red-300 mb-4" />
-          <h2 className="text-2xl font-bold mb-2">Error de Verificación</h2>
-          <p className="text-red-200">Invitado no encontrado.</p>
+      <div 
+        className={`fixed inset-x-4 bottom-24 z-20 flex justify-center transition-transform duration-300 ${result ? 'scale-100' : 'scale-95'}`}
+        onClick={clearResult}
+        aria-live="polite"
+      >
+        <div className={`${bgColor} text-white rounded-xl shadow-2xl p-6 w-full max-w-sm flex items-start space-x-4`}>
+          <div className="flex-shrink-0 pt-1">
+            <Icon className="w-8 h-8" />
+          </div>
+          <div>
+            <h3 className="text-xl font-bold">{title}</h3>
+            {guestName && <p className="text-lg mt-1">{guestName}</p>}
+            {guestDetails && <p className="text-sm opacity-80">{guestDetails}</p>}
+          </div>
         </div>
       </div>
     );
-  }
-
-  const { status, guest } = result;
-  const isSuccess = status === 'SUCCESS';
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50" onClick={onClose}>
-      <div className={`text-white p-8 rounded-2xl shadow-xl text-center max-w-sm mx-4 border-4 ${isSuccess ? 'bg-green-600 border-green-400' : 'bg-yellow-600 border-yellow-400'}`}>
-        {isSuccess ? 
-          <CheckIcon className="w-20 h-20 mx-auto text-white mb-4" /> : 
-          <WarningIcon className="w-20 h-20 mx-auto text-white mb-4" />}
-        <h2 className="text-3xl font-bold mb-2">{isSuccess ? 'Acceso Permitido' : 'Ya Admitido'}</h2>
-        
-        <div className="bg-black bg-opacity-20 p-4 rounded-lg mt-6 text-left space-y-2">
-            <p><span className="font-semibold">Nombre:</span> {guest.name}</p>
-            <p><span className="font-semibold">Empresa:</span> {guest.company}</p>
-            <p><span className="font-semibold">Nivel de Acceso:</span> {guest.accessLevel}</p>
-            {guest.checkedInAt && <p><span className="font-semibold">Hora de Admisión:</span> {new Date(guest.checkedInAt).toLocaleTimeString()}</p>}
-        </div>
-
-      </div>
-    </div>
-  );
-};
-
-const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
-  const { checkInGuest } = useGuests();
-  const [scanResult, setScanResult] = useState<CheckInResult | null>(null);
-  const isScanningRef = useRef(true);
-  const [viewMode, setViewMode] = useState<'selection' | 'scan' | 'manual'>('selection');
-  const [manualId, setManualId] = useState('');
-
-  const handleScan = useCallback((data: any, error: any) => {
-    if (!!data && isScanningRef.current) {
-      isScanningRef.current = false;
-      try {
-        const parsed = JSON.parse(data.text);
-        if (parsed.id) {
-          const result = checkInGuest(parsed.id);
-          setScanResult(result);
-        } else {
-            setScanResult({ status: 'NOT_FOUND', guest: null });
-        }
-      } catch (e) {
-        setScanResult({ status: 'NOT_FOUND', guest: null });
-        console.error("Invalid QR code format", e);
-      }
-    }
-  }, [checkInGuest]);
-
-  const handleManualSubmit = useCallback((e: React.FormEvent) => {
-      e.preventDefault();
-      if (manualId.trim()) {
-          const result = checkInGuest(manualId.trim());
-          setScanResult(result);
-          setManualId('');
-      }
-  }, [manualId, checkInGuest]);
-
-  const closeModal = useCallback(() => {
-    setScanResult(null);
-    setViewMode('selection');
-    setTimeout(() => { isScanningRef.current = true }, 300);
-  }, []);
+  };
   
-  const renderContent = () => {
-    switch (viewMode) {
-      case 'scan':
-        return (
-            <>
-                <div className="w-full aspect-square">
-                    <div className="border-4 border-dashed border-gray-600 rounded-2xl overflow-hidden w-full h-full">
-                        <QrReader
-                            onResult={handleScan}
-                            constraints={{ facingMode: 'environment' }}
-                            videoContainerStyle={{ width: '100%', height: '100%', paddingTop: 0 }}
-                            videoStyle={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
-                    </div>
-                </div>
-                 <p className="absolute bottom-0 left-0 right-0 p-8 text-center text-gray-300 bg-black bg-opacity-50">
-                    Apunta la cámara al código QR de un invitado
-                </p>
-                <button 
-                    onClick={() => setViewMode('selection')}
-                    className="absolute bottom-24 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-md transition duration-300 z-10"
-                >
-                    Cambiar Método
+  if (!selectedEventId) {
+    return (
+        <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-4">
+            <header className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center">
+                <h1 className="text-2xl font-bold">Control de Acceso</h1>
+                <button onClick={onLogout} className="bg-red-600 hover:bg-red-700 font-bold py-2 px-4 rounded-md transition duration-300">
+                    Salir
                 </button>
-            </>
-        );
-      case 'manual':
-        return (
-            <>
-                <div className="w-full aspect-square flex flex-col items-center justify-center bg-gray-900 border-4 border-dashed border-gray-600 rounded-2xl p-8">
-                    <h2 className="text-2xl font-bold mb-6 text-center">Entrada Manual de Invitado</h2>
-                    <form onSubmit={handleManualSubmit} className="w-full max-w-sm space-y-4">
-                        <div>
-                            <label htmlFor="guestId" className="block text-sm font-medium text-gray-400 mb-1">
-                                ID del Invitado
-                            </label>
-                            <input
-                                id="guestId"
-                                type="text"
-                                value={manualId}
-                                onChange={(e) => setManualId(e.target.value.toUpperCase())}
-                                placeholder="Ej: A4B1C2"
-                                maxLength={6}
-                                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm placeholder-gray-500 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                                required
-                            />
-                        </div>
-                        <button
-                            type="submit"
-                            className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-indigo-500 transition-colors"
-                        >
-                            Verificar Invitado
-                        </button>
-                    </form>
-                </div>
-                <button 
-                    onClick={() => setViewMode('selection')}
-                    className="mt-6 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-md transition duration-300"
-                >
-                    Cambiar Método
-                </button>
-            </>
-        );
-      case 'selection':
-      default:
-        return (
-            <div className="w-full aspect-square flex flex-col items-center justify-center bg-gray-900 border-4 border-dashed border-gray-600 rounded-2xl p-8 text-center">
-                <h2 className="text-2xl font-bold mb-8">Elige un Método de Verificación</h2>
-                <div className="space-y-4 w-full max-w-xs">
-                    <button 
-                        onClick={() => setViewMode('scan')}
-                        className="w-full px-6 py-4 rounded-md font-semibold transition-colors bg-indigo-600 text-white hover:bg-indigo-700 text-lg"
+            </header>
+            <div className="text-center bg-gray-800 p-10 rounded-lg max-w-lg w-full">
+                <h2 className="text-xl font-semibold text-gray-300 mb-4">Selecciona un Evento</h2>
+                {events.length > 0 ? (
+                    <select
+                        value={selectedEventId || ''}
+                        onChange={(e) => selectEvent(e.target.value || null)}
+                        className="w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-3 px-4 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                     >
-                        Escanear QR
-                    </button>
-                    <button 
-                        onClick={() => setViewMode('manual')}
-                        className="w-full px-6 py-4 rounded-md font-semibold transition-colors bg-gray-700 text-gray-300 hover:bg-gray-600 text-lg"
-                    >
-                        Entrada Manual
-                    </button>
-                </div>
+                        <option value="">-- Elige un evento --</option>
+                        {events.map(event => (
+                            <option key={event.id} value={event.id}>{event.name}</option>
+                        ))}
+                    </select>
+                ) : (
+                    <p className="text-gray-400 mt-2">No hay eventos disponibles. Pídele a un organizador que cree uno.</p>
+                )}
             </div>
-        )
-    }
+        </div>
+    );
   }
 
-
   return (
-    <div className="relative min-h-screen bg-black flex flex-col items-center justify-center p-4">
-      <header className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center z-20 bg-black bg-opacity-50">
-          <h1 className="text-xl font-bold">Acceso Controlador</h1>
-          <button onClick={onLogout} className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md transition duration-300">
-              Cerrar Sesión
-          </button>
-      </header>
+    <div className="relative h-screen w-screen bg-black overflow-hidden">
+      <Scanner
+        onDecode={(result) => handleScan(result, null)}
+        onError={(error) => handleScan(null, error)}
+        containerStyle={{ width: '100%', height: '100%', paddingTop: 0 }}
+        videoStyle={{ width: '100%', height: '100%', objectFit: 'cover' }}
+      />
       
-      <main className="w-full max-w-lg flex flex-col items-center justify-center flex-grow">
-        {renderContent()}
-      </main>
+      <div className="absolute inset-0 bg-black bg-opacity-30 pointer-events-none"></div>
 
-      {scanResult && <ScanResultModal result={scanResult} onClose={closeModal} />}
+      <header className="absolute top-0 left-0 right-0 z-10 p-4 flex justify-between items-center bg-gradient-to-b from-black/60 to-transparent">
+        <div>
+            <h1 className="text-2xl font-bold text-white shadow-md">Control de Acceso</h1>
+            <p className="text-indigo-300 font-semibold shadow-md truncate max-w-xs">{selectedEvent?.name}</p>
+        </div>
+        <button onClick={onLogout} className="bg-red-600/80 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-md transition duration-300 backdrop-blur-sm flex-shrink-0">
+          Salir
+        </button>
+      </header>
+
+      {renderResult()}
+
+      {!result && (
+        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 z-0 flex justify-center pointer-events-none">
+          <div className="w-64 h-64 border-4 border-white/50 rounded-2xl animate-pulse"></div>
+        </div>
+      )}
+
+      <div className="absolute inset-x-4 bottom-4 z-10">
+        {!showManualInput ? (
+          <button
+            onClick={() => setShowManualInput(true)}
+            className="w-full bg-indigo-600/80 hover:bg-indigo-600 text-white font-bold py-3 px-4 rounded-xl transition duration-300 backdrop-blur-sm"
+          >
+            Introducir ID Manualmente
+          </button>
+        ) : (
+          <form onSubmit={handleManualSubmit} className="bg-gray-800/80 p-4 rounded-xl backdrop-blur-sm">
+            <label htmlFor="manual-id" className="block text-sm font-medium text-gray-300 mb-2">
+              Introduce el ID del invitado
+            </label>
+            <div className="flex space-x-2">
+              <input
+                id="manual-id"
+                type="text"
+                value={manualId}
+                onChange={(e) => setManualId(e.target.value.toUpperCase())}
+                autoCapitalize="characters"
+                placeholder="ABC123"
+                className="flex-grow bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                autoFocus
+              />
+              <button
+                type="submit"
+                className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md transition duration-300"
+              >
+                Verificar
+              </button>
+            </div>
+            {manualError && <p className="text-red-400 text-sm mt-2">{manualError}</p>}
+            <button
+                type="button"
+                onClick={() => setShowManualInput(false)}
+                className="w-full text-center text-gray-400 text-sm mt-3 hover:text-white"
+            >
+                Cancelar
+            </button>
+          </form>
+        )}
+      </div>
     </div>
   );
 };
