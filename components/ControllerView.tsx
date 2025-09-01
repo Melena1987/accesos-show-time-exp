@@ -168,9 +168,14 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
              <div className="w-full max-w-lg text-center bg-gray-800 p-8 md:p-10 rounded-2xl shadow-lg">
                 <h2 className="text-2xl font-bold text-red-400 mb-2">Error de Carga</h2>
                 <p className="text-gray-300">{error}</p>
-                <button onClick={() => window.location.reload()} className="mt-6 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md">
-                    Reintentar
-                </button>
+                <div className="mt-6 flex flex-col sm:flex-row justify-center gap-4">
+                  <button onClick={() => window.location.reload()} className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md transition-colors">
+                      Reintentar
+                  </button>
+                  <button onClick={onLogout} className="w-full sm:w-auto bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition-colors">
+                      Menú Principal
+                  </button>
+                </div>
             </div>
         </div>
      );
@@ -213,7 +218,7 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
 
   return (
     <div className="relative h-screen w-screen bg-black overflow-hidden">
-      {/* FIX: The 'onResult' prop for the Scanner component is deprecated. Replaced with 'onDecode', and updated the callback to handle a string result directly. */}
+      {/* FIX: The 'onResult' prop is not supported by the installed scanner library version. Replaced with 'onDecode', which provides the scanned text directly as a string. */}
       <Scanner
         onDecode={(result) => {
           if (result) {

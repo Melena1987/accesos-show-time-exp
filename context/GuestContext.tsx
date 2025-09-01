@@ -18,10 +18,13 @@ interface GuestContextType {
 
 export const GuestContext = createContext<GuestContextType | undefined>(undefined);
 
-// IMPORTANTE: La aplicación ahora usa un almacén de datos público y compartido para sincronizarse entre dispositivos.
-// Los datos son de acceso público en la URL de abajo. No almacenes información sensible.
-// La persistencia y disponibilidad de los datos dependen del servicio npoint.io.
+// IMPORTANTE: La aplicación ahora usa un almacén de datos público y compartido (npoint.io)
+// para demostrar la sincronización entre dispositivos. Este servicio puede no ser siempre fiable.
+// Para mejorar la robustez, la aplicación guarda una copia local de tus datos en tu navegador.
+// Si el servicio en la nube falla, seguirás teniendo acceso a tus datos guardados localmente.
+// Para una solución de producción, se recomienda usar un servicio de base de datos más robusto como Google Firebase.
 const DATA_STORAGE_URL = 'https://api.npoint.io/4a34241e17d7a79b88a9';
+const LOCAL_STORAGE_KEY = 'showtime-guest-data';
 
 
 export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -36,34 +39,50 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const clearError = () => setError(null);
 
+  const parseAndSetData = (data: any) => {
+    const { events: storedEvents, guests: storedGuests } = data || {};
+                
+    const parsedGuests = Array.isArray(storedGuests)
+      ? storedGuests.map((g: any) => ({
+          ...g,
+          checkedInAt: g.checkedInAt ? new Date(g.checkedInAt) : null,
+        }))
+      : [];
+    
+    setEvents(Array.isArray(storedEvents) ? storedEvents : []);
+    setGuests(parsedGuests);
+  };
+
   useEffect(() => {
     const loadData = async () => {
+      setIsLoading(true);
       try {
         const response = await fetch(DATA_STORAGE_URL, { cache: 'no-store' });
-        if (response.ok) {
-            const storedData = await response.json();
-            if (storedData && typeof storedData === 'object') {
-                const { events: storedEvents, guests: storedGuests } = storedData;
-                
-                const parsedGuests = Array.isArray(storedGuests)
-                  ? storedGuests.map((g: any) => ({
-                      ...g,
-                      checkedInAt: g.checkedInAt ? new Date(g.checkedInAt) : null,
-                    }))
-                  : [];
-                
-                setEvents(Array.isArray(storedEvents) ? storedEvents : []);
-                setGuests(parsedGuests);
-            }
-            hasLoaded.current = true;
+        if (!response.ok) {
+          throw new Error(`Error del servidor: ${response.statusText}`);
+        }
+        const remoteData = await response.json();
+        if (remoteData && typeof remoteData === 'object' && (remoteData.events || remoteData.guests)) {
+            parseAndSetData(remoteData);
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(remoteData));
         } else {
-            throw new Error(`Error al cargar los datos: ${response.statusText}`);
+            throw new Error('Los datos remotos están vacíos o no son válidos.');
         }
       } catch (err) {
-        console.error("Fallo al cargar datos del almacén remoto.", err);
-        setError("No se pudieron cargar los datos. Comprueba tu conexión e inténtalo de nuevo.");
+        console.warn("Fallo al cargar datos remotos. Intentando cargar desde el almacenamiento local.", err);
+        setError("No se pudo conectar al servidor. Mostrando datos locales.");
+        try {
+          const localDataString = localStorage.getItem(LOCAL_STORAGE_KEY);
+          if (localDataString) {
+            parseAndSetData(JSON.parse(localDataString));
+          }
+        } catch (localErr) {
+          console.error("Fallo al cargar datos del almacenamiento local.", localErr);
+          setError("Error crítico: No se pudieron cargar los datos remotos ni locales.");
+        }
       } finally {
         setIsLoading(false);
+        hasLoaded.current = true;
       }
     };
     
@@ -71,35 +90,40 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   }, []);
   
   useEffect(() => {
-    if (!hasLoaded.current) {
+    if (!hasLoaded.current || isLoading) {
       return;
     }
 
-    const saveData = async () => {
-      // No guardar si el estado es el inicial vacío, podría ser por un error de carga
-      if (events.length === 0 && guests.length === 0 && !localStorage.getItem('showtime_has_data')) {
-         return;
-      }
-      localStorage.setItem('showtime_has_data', 'true');
+    const dataToSave = { events, guests };
+    
+    // 1. Save locally immediately to prevent data loss
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(dataToSave));
 
+    // 2. Attempt to sync with remote storage (debounced)
+    const timerId = setTimeout(async () => {
       try {
         const response = await fetch(DATA_STORAGE_URL, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ events, guests }),
+          body: JSON.stringify(dataToSave),
         });
         if (!response.ok) {
             throw new Error(`Error al guardar los datos: ${response.statusText}`);
         }
+         // On successful sync, if the error was a sync error, clear it.
+        if (error?.includes("sincronizar")) {
+             clearError();
+        }
       } catch (err) {
-        console.error("Fallo al guardar datos en el almacén remoto:", err);
-        setError("El último cambio no se pudo guardar. Comprueba tu conexión.");
+        console.error("Fallo al sincronizar datos con el almacén remoto:", err);
+        setError("El último cambio no se pudo sincronizar. Tus datos están guardados localmente.");
       }
-    };
+    }, 500); // 500ms debounce
 
-    saveData();
+    return () => clearTimeout(timerId);
+
   }, [events, guests]);
 
   useEffect(() => {
@@ -162,34 +186,22 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const checkInGuest = (guestId: string): CheckInResult => {
     const normalizedGuestId = guestId.toUpperCase().trim();
-    let guestToUpdate: Guest | undefined;
-    
-    setGuests(currentGuests => {
-        const guestIndex = currentGuests.findIndex(g => g.id === normalizedGuestId);
-        if (guestIndex === -1) {
-            guestToUpdate = undefined;
-            return currentGuests;
-        }
+    const guest = guests.find(g => g.id === normalizedGuestId);
 
-        const guest = currentGuests[guestIndex];
-        if (guest.checkedInAt) {
-            guestToUpdate = guest;
-            return currentGuests; 
-        }
-
-        guestToUpdate = { ...guest, checkedInAt: new Date() };
-        const updatedGuests = [...currentGuests];
-        updatedGuests[guestIndex] = guestToUpdate;
-        return updatedGuests;
-    });
-
-    if (!guestToUpdate) {
-        return { status: 'NOT_FOUND', guest: null };
+    if (!guest) {
+      return { status: 'NOT_FOUND', guest: null };
     }
-    if (guestToUpdate.checkedInAt && (new Date().getTime() - new Date(guestToUpdate.checkedInAt).getTime()) > 1000) {
-        return { status: 'ALREADY_CHECKED_IN', guest: guestToUpdate };
+
+    if (guest.checkedInAt) {
+      return { status: 'ALREADY_CHECKED_IN', guest };
     }
-    return { status: 'SUCCESS', guest: guestToUpdate };
+
+    const updatedGuest = { ...guest, checkedInAt: new Date() };
+    setGuests(currentGuests =>
+      currentGuests.map(g => (g.id === normalizedGuestId ? updatedGuest : g))
+    );
+
+    return { status: 'SUCCESS', guest: updatedGuest };
   };
 
 
