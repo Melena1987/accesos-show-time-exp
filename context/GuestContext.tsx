@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useState, useEffect, ReactNode, useRef } from 'react';
 import { Guest, AccessLevel, CheckInResult, Event } from '../types';
 
 interface GuestContextType {
@@ -27,33 +27,34 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     return localStorage.getItem('selectedEventId');
   });
   const [isLoading, setIsLoading] = useState(true);
+  const hasLoaded = useRef(false); // Ref to track if initial load is complete.
 
   // Efecto para cargar los datos iniciales del almacén remoto.
   useEffect(() => {
     const loadData = async () => {
       try {
         const response = await fetch(DATA_STORAGE_URL, { cache: 'no-store' });
-        if (!response.ok) return;
-        
-        const storedData = await response.json();
-
-        if (storedData && typeof storedData === 'object') {
-            const { events: storedEvents, guests: storedGuests } = storedData;
-            
-            const parsedGuests = Array.isArray(storedGuests)
-              ? storedGuests.map((g: any) => ({
-                  ...g,
-                  checkedInAt: g.checkedInAt ? new Date(g.checkedInAt) : null,
-                }))
-              : [];
-            
-            setEvents(Array.isArray(storedEvents) ? storedEvents : []);
-            setGuests(parsedGuests);
+        if (response.ok) {
+            const storedData = await response.json();
+            if (storedData && typeof storedData === 'object') {
+                const { events: storedEvents, guests: storedGuests } = storedData;
+                
+                const parsedGuests = Array.isArray(storedGuests)
+                  ? storedGuests.map((g: any) => ({
+                      ...g,
+                      checkedInAt: g.checkedInAt ? new Date(g.checkedInAt) : null,
+                    }))
+                  : [];
+                
+                setEvents(Array.isArray(storedEvents) ? storedEvents : []);
+                setGuests(parsedGuests);
+            }
         }
       } catch (error) {
         console.error("Fallo al cargar datos del almacén remoto. Se continuará con el estado vacío.", error);
       } finally {
         setIsLoading(false);
+        hasLoaded.current = true; // Mark loading as complete here.
       }
     };
     
@@ -61,10 +62,11 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   }, []);
   
   // Efecto para persistir los datos en el almacén remoto CADA VEZ que cambien.
-  // Este efecto solo se ejecuta después de que la carga inicial haya terminado (isLoading es false).
   useEffect(() => {
-    if (isLoading) {
-      return; // No guardar nada mientras se cargan los datos iniciales.
+    // Solo guardar si la carga inicial de datos ha finalizado.
+    // Esto previene la condición de carrera donde se guardaba un estado vacío al inicio.
+    if (!hasLoaded.current) {
+      return;
     }
 
     const saveData = async () => {
@@ -82,7 +84,7 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     };
 
     saveData();
-  }, [events, guests, isLoading]);
+  }, [events, guests]); // Depende únicamente de los datos para ejecutarse.
 
   // Efecto para persistir el evento seleccionado en localStorage.
   useEffect(() => {

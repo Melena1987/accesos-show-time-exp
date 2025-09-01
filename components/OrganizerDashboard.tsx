@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { toPng } from 'html-to-image';
 import { useGuests } from '../hooks/useGuests';
 import { Guest, AccessLevel } from '../types';
@@ -162,22 +162,36 @@ const OrganizerDashboard: React.FC<OrganizerDashboardProps> = ({ onLogout, logge
   const invitationRef = useRef<HTMLDivElement>(null);
   const [selectedGuest, setSelectedGuest] = useState<Guest | null>(null);
 
-  const handleGenerateInvitation = async (guest: Guest) => {
+  useEffect(() => {
+    if (selectedGuest && invitationRef.current) {
+      const element = invitationRef.current;
+      // Use a small delay to ensure the QR code canvas and any web fonts have rendered.
+      const timer = setTimeout(async () => {
+        try {
+          const dataUrl = await toPng(element, { 
+            cacheBust: true,
+            pixelRatio: 2 // Improve image quality on high-DPI screens
+          });
+          const link = document.createElement('a');
+          link.download = `invitacion-${selectedGuest.name.replace(/\s+/g, '-')}.png`;
+          link.href = dataUrl;
+          link.click();
+        } catch (err) {
+          console.error('Failed to generate invitation image', err);
+          alert('Error: No se pudo generar la imagen de la invitación.');
+        } finally {
+          // Reset the selected guest to hide the component and allow generating again.
+          setSelectedGuest(null);
+        }
+      }, 100);
+
+      return () => clearTimeout(timer);
+    }
+  }, [selectedGuest]);
+
+  const handleGenerateInvitation = (guest: Guest) => {
+    // Simply set the guest to trigger the useEffect that handles image generation.
     setSelectedGuest(guest);
-    setTimeout(async () => {
-      if (invitationRef.current === null) return;
-      try {
-        const dataUrl = await toPng(invitationRef.current, { cacheBust: true });
-        const link = document.createElement('a');
-        link.download = `invitacion-${guest.name.replace(/\s+/g, '-')}.png`;
-        link.href = dataUrl;
-        link.click();
-      } catch (err) {
-        console.error('Failed to generate invitation image', err);
-      } finally {
-        setSelectedGuest(null);
-      }
-    }, 100);
   };
   
   const currentGuests = guests.filter(g => g.eventId === selectedEventId);
@@ -239,6 +253,7 @@ const OrganizerDashboard: React.FC<OrganizerDashboardProps> = ({ onLogout, logge
         </main>
       </div>
       
+      {/* This component is rendered off-screen and used as a template for the image generation */}
       {selectedGuest && selectedEvent && (
         <div className="fixed -top-full -left-full">
           <Invitation guest={selectedGuest} eventName={selectedEvent.name} ref={invitationRef} />
