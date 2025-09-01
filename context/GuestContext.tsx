@@ -40,7 +40,7 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       if (storedData) {
         const { events: storedEvents, guests: storedGuests } = JSON.parse(storedData);
         
-        const parsedGuests = storedGuests.map((g: any) => ({
+        const parsedGuests = (storedGuests || []).map((g: any) => ({
           ...g,
           checkedInAt: g.checkedInAt ? new Date(g.checkedInAt) : null,
         }));
