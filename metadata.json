@@ -1,7 +1,5 @@
 {
   "name": "ACCESOS SHOW TIME",
   "description": "Una plataforma de control de acceso para invitados VIP en eventos. Los organizadores pueden crear invitaciones con código QR y los controladores pueden escanearlos en la entrada para validar y gestionar el acceso de los invitados.",
-  "requestFramePermissions": [
-    "camera"
-  ]
+  "requestFramePermissions": []
 }
