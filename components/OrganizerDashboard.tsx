@@ -159,10 +159,20 @@ const EventManager: React.FC = () => {
 }
 
 const OrganizerDashboard: React.FC<OrganizerDashboardProps> = ({ onLogout, loggedInUser }) => {
-  const { guests, events, selectedEventId, isLoading } = useGuests();
+  const { guests, events, selectedEventId, isLoading, selectEvent } = useGuests();
   const invitationRef = useRef<HTMLDivElement>(null);
   const [selectedGuest, setSelectedGuest] = useState<Guest | null>(null);
 
+  const selectedEvent = events.find(e => e.id === selectedEventId);
+
+  useEffect(() => {
+    // If there's a selectedEventId but it doesn't correspond to any existing event,
+    // and data is not loading, reset the selection. This can happen if an event is deleted.
+    if (selectedEventId && !selectedEvent && !isLoading) {
+      selectEvent(null);
+    }
+  }, [selectedEventId, selectedEvent, isLoading, selectEvent]);
+  
   useEffect(() => {
     if (selectedGuest && invitationRef.current) {
       const element = invitationRef.current;
@@ -196,7 +206,6 @@ const OrganizerDashboard: React.FC<OrganizerDashboardProps> = ({ onLogout, logge
   };
   
   const currentGuests = guests.filter(g => g.eventId === selectedEventId);
-  const selectedEvent = events.find(e => e.id === selectedEventId);
 
   if (isLoading) {
     return (
@@ -235,12 +244,12 @@ const OrganizerDashboard: React.FC<OrganizerDashboardProps> = ({ onLogout, logge
         <main>
             <EventManager />
             
-            {selectedEventId ? (
+            {selectedEvent ? (
                 <div>
-                     <h2 className="text-2xl font-bold mb-6 text-indigo-400">Gestionando Invitados para: {selectedEvent?.name}</h2>
+                     <h2 className="text-2xl font-bold mb-6 text-indigo-400">Gestionando Invitados para: {selectedEvent.name}</h2>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                         <div className="md:col-span-1">
-                            <GuestForm eventId={selectedEventId} organizerName={loggedInUser} />
+                            <GuestForm eventId={selectedEvent.id} organizerName={loggedInUser} />
                         </div>
                         <div className="md:col-span-2">
                             <GuestList guests={currentGuests} onGenerateInvitation={handleGenerateInvitation} />
