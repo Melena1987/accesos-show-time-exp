@@ -193,7 +193,7 @@ const EventManager: React.FC = () => {
 }
 
 const OrganizerDashboard: React.FC<OrganizerDashboardProps> = ({ onLogout, loggedInUser }) => {
-  const { guests, events, selectedEventId, isLoading, error, clearError, selectEvent, deleteGuest } = useGuests();
+  const { guests, events, selectedEventId, isLoading, isOffline, error, clearError, selectEvent, deleteGuest } = useGuests();
   const invitationRef = useRef<HTMLDivElement>(null);
   const [selectedGuest, setSelectedGuest] = useState<Guest | null>(null);
 
@@ -260,6 +260,11 @@ const OrganizerDashboard: React.FC<OrganizerDashboardProps> = ({ onLogout, logge
   return (
     <>
       <div className="min-h-screen bg-gray-900 p-4 md:p-8">
+        {isOffline && (
+            <div className="bg-yellow-800 border-yellow-600 text-white px-4 py-2 rounded-lg relative mb-6 text-center" role="status">
+                <span className="font-semibold">Modo sin conexión:</span> Los cambios se guardarán y sincronizarán cuando recuperes la conexión.
+            </div>
+        )}
         {error && (
             <div className="bg-red-800 border border-red-600 text-white px-4 py-3 rounded-lg relative mb-6" role="alert">
                 <strong className="font-bold">Error: </strong>

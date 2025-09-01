@@ -11,7 +11,7 @@ interface ControllerViewProps {
 }
 
 const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
-  const { checkInGuest, guests, events, selectedEventId, selectEvent, isLoading, error } = useGuests();
+  const { checkInGuest, guests, events, selectedEventId, selectEvent, isLoading, isOffline, error } = useGuests();
   const [result, setResult] = useState<CheckInResult | null>(null);
   const [showManualInput, setShowManualInput] = useState(false);
   const [manualId, setManualId] = useState('');
@@ -44,7 +44,7 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
     };
   }, []);
 
-  const handleScan = useCallback((decodedText: string) => {
+  const handleScan = useCallback(async (decodedText: string) => {
     if (resultTimeoutRef.current) {
       clearTimeout(resultTimeoutRef.current);
     }
@@ -61,7 +61,7 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
                guest: { ...guest, company: `Evento: ${guestEvent?.name || 'Otro'}` } as Guest
            };
         } else {
-          checkInResult = checkInGuest(qrData.id);
+          checkInResult = await checkInGuest(qrData.id);
         }
       } else {
         checkInResult = { status: 'NOT_FOUND', guest: null };
@@ -74,7 +74,7 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
     resultTimeoutRef.current = window.setTimeout(clearResult, 5000);
   }, [checkInGuest, clearResult, guests, selectedEventId, events]);
 
-  const handleManualSubmit = (e: React.FormEvent) => {
+  const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setManualError('');
     if (!manualId.trim()) {
@@ -95,7 +95,7 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
            guest: { ...guest, company: `Evento: ${guestEvent?.name || 'Otro'}` } as Guest
        };
     } else {
-      checkInResult = checkInGuest(manualId);
+      checkInResult = await checkInGuest(manualId);
     }
     
     setResult(checkInResult);
@@ -157,17 +157,17 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
   if (isLoading) {
     return (
         <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-            <p className="text-xl">Cargando eventos...</p>
+            <p className="text-xl">Cargando datos desde la nube...</p>
         </div>
     );
   }
   
-  if (error) {
+  if (error && events.length === 0) {
      return (
         <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-4">
              <div className="w-full max-w-lg text-center bg-gray-800 p-8 md:p-10 rounded-2xl shadow-lg">
-                <h2 className="text-2xl font-bold text-red-400 mb-2">Error de Carga</h2>
-                <p className="text-gray-300">{error}</p>
+                <h2 className="text-2xl font-bold text-red-400 mb-2">Error de Conexión</h2>
+                <p className="text-gray-300">No se pudieron cargar los datos iniciales. Comprueba tu conexión a internet.</p>
                 <div className="mt-6 flex flex-col sm:flex-row justify-center gap-4">
                   <button onClick={() => window.location.reload()} className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md transition-colors">
                       Reintentar
@@ -211,6 +211,9 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
                 ) : (
                     <p className="text-gray-400 mt-4">No hay eventos disponibles. Pídele a un organizador que cree uno.</p>
                 )}
+                 {isOffline && (
+                    <p className="text-yellow-400 text-sm mt-6">Modo sin conexión activado.</p>
+                )}
             </div>
         </div>
     );
@@ -218,13 +221,9 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
 
   return (
     <div className="relative h-screen w-screen bg-black overflow-hidden">
-      {/* FIX: The 'onResult' prop is not supported by the installed scanner library version. Replaced with 'onDecode', which provides the scanned text directly as a string. */}
+      {/* This component uses a specific library version, so `onDecode` is the correct prop. */}
       <Scanner
-        onDecode={(result) => {
-          if (result) {
-            handleScan(result);
-          }
-        }}
+        onDecode={handleScan}
         onError={(error: any) => console.error(error?.message)}
         containerStyle={{ width: '100%', height: '100%', paddingTop: 0 }}
         videoStyle={{ width: '100%', height: '100%', objectFit: 'cover' }}
@@ -242,6 +241,12 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
           <span>Menú Principal</span>
         </button>
       </header>
+
+      {isOffline && (
+        <div className="absolute top-24 left-1/2 -translate-x-1/2 z-10 bg-yellow-600/90 text-white text-sm font-semibold py-2 px-4 rounded-lg backdrop-blur-sm shadow-lg">
+            Modo sin conexión
+        </div>
+      )}
 
       {renderResult()}
 

@@ -9,7 +9,7 @@ interface AdminDashboardProps {
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
-  const { events, guests, isLoading, error, clearError, deleteEvent } = useGuests();
+  const { events, guests, isLoading, isOffline, error, clearError, deleteEvent } = useGuests();
 
   const handleExportToCSV = (event: Event, eventGuests: Guest[]) => {
     const headers = ["ID Invitado", "Nombre", "Empresa", "Nivel Acceso", "Invitado Por", "Hora Admisión"];
@@ -60,6 +60,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
 
   return (
     <div className="min-h-screen bg-gray-900 p-4 md:p-8">
+      {isOffline && (
+          <div className="bg-yellow-800 border-yellow-600 text-white px-4 py-2 rounded-lg relative mb-6 text-center" role="status">
+              <span className="font-semibold">Modo sin conexión:</span> Estás viendo datos guardados localmente.
+          </div>
+      )}
       {error && (
             <div className="bg-red-800 border border-red-600 text-white px-4 py-3 rounded-lg relative mb-6" role="alert">
                 <strong className="font-bold">Error: </strong>

@@ -1,4 +1,18 @@
-import React, { createContext, useState, useEffect, ReactNode, useRef } from 'react';
+import React, { createContext, useState, useEffect, ReactNode } from 'react';
+import { db } from '../firebase';
+import { 
+  collection, 
+  onSnapshot, 
+  addDoc, 
+  deleteDoc, 
+  doc, 
+  query, 
+  where, 
+  getDocs, 
+  writeBatch,
+  updateDoc,
+  Timestamp 
+} from 'firebase/firestore';
 import { Guest, AccessLevel, CheckInResult, Event } from '../types';
 
 interface GuestContextType {
@@ -6,26 +20,18 @@ interface GuestContextType {
   guests: Guest[];
   selectedEventId: string | null;
   isLoading: boolean;
+  isOffline: boolean;
   error: string | null;
-  addEvent: (name: string) => void;
+  addEvent: (name: string) => Promise<void>;
   selectEvent: (eventId: string | null) => void;
-  deleteEvent: (eventId: string) => void;
-  addGuest: (name: string, company: string, accessLevel: AccessLevel, eventId: string, invitedBy: string) => void;
-  deleteGuest: (guestId: string) => void;
-  checkInGuest: (guestId: string) => CheckInResult;
+  deleteEvent: (eventId: string) => Promise<void>;
+  addGuest: (name: string, company: string, accessLevel: AccessLevel, eventId: string, invitedBy: string) => Promise<void>;
+  deleteGuest: (guestId: string) => Promise<void>;
+  checkInGuest: (guestId: string) => Promise<CheckInResult>;
   clearError: () => void;
 }
 
 export const GuestContext = createContext<GuestContextType | undefined>(undefined);
-
-// IMPORTANTE: La aplicación ahora usa un almacén de datos público y compartido (npoint.io)
-// para demostrar la sincronización entre dispositivos. Este servicio puede no ser siempre fiable.
-// Para mejorar la robustez, la aplicación guarda una copia local de tus datos en tu navegador.
-// Si el servicio en la nube falla, seguirás teniendo acceso a tus datos guardados localmente.
-// Para una solución de producción, se recomienda usar un servicio de base de datos más robusto como Google Firebase.
-const DATA_STORAGE_URL = 'https://api.npoint.io/4a34241e17d7a79b88a9';
-const LOCAL_STORAGE_KEY = 'showtime-guest-data';
-
 
 export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [events, setEvents] = useState<Event[]>([]);
@@ -34,98 +40,70 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     return localStorage.getItem('selectedEventId');
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [isOffline, setIsOffline] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const hasLoaded = useRef(false);
 
   const clearError = () => setError(null);
 
-  const parseAndSetData = (data: any) => {
-    const { events: storedEvents, guests: storedGuests } = data || {};
-                
-    const parsedGuests = Array.isArray(storedGuests)
-      ? storedGuests.map((g: any) => ({
-          ...g,
-          checkedInAt: g.checkedInAt ? new Date(g.checkedInAt) : null,
-        }))
-      : [];
-    
-    setEvents(Array.isArray(storedEvents) ? storedEvents : []);
-    setGuests(parsedGuests);
-  };
-
   useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true);
-      try {
-        const response = await fetch(DATA_STORAGE_URL, { cache: 'no-store' });
-        if (!response.ok) {
-          throw new Error(`Error del servidor: ${response.statusText}`);
+    setIsLoading(true);
+    let connectionError = false;
+
+    // Listener for events collection in Firestore
+    const eventsCollection = collection(db, 'events');
+    const unsubscribeEvents = onSnapshot(eventsCollection, (snapshot) => {
+      if (snapshot.metadata.fromCache) {
+        setIsOffline(true);
+        if (connectionError) {
+          setError("Sin conexión. Mostrando datos locales.");
         }
-        const remoteData = await response.json();
-        if (remoteData && typeof remoteData === 'object' && (remoteData.events || remoteData.guests)) {
-            parseAndSetData(remoteData);
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(remoteData));
-        } else {
-            throw new Error('Los datos remotos están vacíos o no son válidos.');
-        }
-      } catch (err) {
-        console.warn("Fallo al cargar datos remotos. Intentando cargar desde el almacenamiento local.", err);
-        setError("No se pudo conectar al servidor. Mostrando datos locales.");
-        try {
-          const localDataString = localStorage.getItem(LOCAL_STORAGE_KEY);
-          if (localDataString) {
-            parseAndSetData(JSON.parse(localDataString));
-          }
-        } catch (localErr) {
-          console.error("Fallo al cargar datos del almacenamiento local.", localErr);
-          setError("Error crítico: No se pudieron cargar los datos remotos ni locales.");
-        }
-      } finally {
-        setIsLoading(false);
-        hasLoaded.current = true;
+      } else {
+        setIsOffline(false);
+        setError(null);
       }
+      
+      const eventsData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        name: doc.data().name,
+      } as Event));
+      setEvents(eventsData);
+      setIsLoading(false);
+    }, (err) => {
+      console.error("Error fetching events from Firestore:", err);
+      connectionError = true;
+      setError("No se pudo conectar a la base de datos. La aplicación está en modo sin conexión.");
+      setIsLoading(false);
+    });
+
+    // Listener for guests collection in Firestore
+    const guestsCollection = collection(db, 'guests');
+    const unsubscribeGuests = onSnapshot(guestsCollection, (snapshot) => {
+      if (snapshot.metadata.fromCache) {
+        setIsOffline(true);
+      } else {
+        setIsOffline(false);
+      }
+
+      const guestsData = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          ...data,
+          checkedInAt: data.checkedInAt ? (data.checkedInAt as Timestamp).toDate() : null,
+        } as Guest;
+      });
+      setGuests(guestsData);
+    }, (err) => {
+      console.error("Error fetching guests from Firestore:", err);
+      setError("No se pudo conectar a la base de datos de invitados.");
+    });
+
+    // Cleanup listeners on component unmount
+    return () => {
+      unsubscribeEvents();
+      unsubscribeGuests();
     };
-    
-    loadData();
   }, []);
   
-  useEffect(() => {
-    if (!hasLoaded.current || isLoading) {
-      return;
-    }
-
-    const dataToSave = { events, guests };
-    
-    // 1. Save locally immediately to prevent data loss
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(dataToSave));
-
-    // 2. Attempt to sync with remote storage (debounced)
-    const timerId = setTimeout(async () => {
-      try {
-        const response = await fetch(DATA_STORAGE_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(dataToSave),
-        });
-        if (!response.ok) {
-            throw new Error(`Error al guardar los datos: ${response.statusText}`);
-        }
-         // On successful sync, if the error was a sync error, clear it.
-        if (error?.includes("sincronizar")) {
-             clearError();
-        }
-      } catch (err) {
-        console.error("Fallo al sincronizar datos con el almacén remoto:", err);
-        setError("El último cambio no se pudo sincronizar. Tus datos están guardados localmente.");
-      }
-    }, 500); // 500ms debounce
-
-    return () => clearTimeout(timerId);
-
-  }, [events, guests]);
-
   useEffect(() => {
     if (selectedEventId) {
       localStorage.setItem('selectedEventId', selectedEventId);
@@ -146,67 +124,118 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     return id;
   };
 
-  const addEvent = (name: string) => {
-    const newEvent: Event = {
-      id: `evt_${new Date().getTime()}`,
-      name,
-    };
-    setEvents(currentEvents => [...currentEvents, newEvent]);
-    setSelectedEventId(newEvent.id);
+  const addEvent = async (name: string) => {
+    try {
+      const newEventRef = await addDoc(collection(db, 'events'), { name });
+      setSelectedEventId(newEventRef.id);
+    } catch (err) {
+      console.error("Error adding event to Firestore: ", err);
+      setError("No se pudo crear el evento.");
+    }
   };
 
   const selectEvent = (eventId: string | null) => {
     setSelectedEventId(eventId);
   };
 
-  const deleteEvent = (eventId: string) => {
-    setEvents(currentEvents => currentEvents.filter(e => e.id !== eventId));
-    setGuests(currentGuests => currentGuests.filter(g => g.eventId !== eventId));
-    if (selectedEventId === eventId) {
-      setSelectedEventId(null);
+  const deleteEvent = async (eventId: string) => {
+    try {
+      const batch = writeBatch(db);
+
+      const guestsQuery = query(collection(db, 'guests'), where('eventId', '==', eventId));
+      const guestsSnapshot = await getDocs(guestsQuery);
+      guestsSnapshot.forEach(doc => {
+        batch.delete(doc.ref);
+      });
+      
+      const eventRef = doc(db, 'events', eventId);
+      batch.delete(eventRef);
+
+      await batch.commit();
+
+      if (selectedEventId === eventId) {
+        setSelectedEventId(null);
+      }
+    } catch (err) {
+      console.error("Error deleting event from Firestore: ", err);
+      setError("No se pudo eliminar el evento y sus invitados.");
     }
   };
 
-  const addGuest = (name: string, company: string, accessLevel: AccessLevel, eventId: string, invitedBy: string) => {
-    const newGuest: Guest = {
-      id: generateShortId(guests.map(g => g.id)),
-      eventId,
-      name,
-      company,
-      accessLevel,
-      checkedInAt: null,
-      invitedBy,
-    };
-    setGuests(currentGuests => [...currentGuests, newGuest]);
+  const addGuest = async (name: string, company: string, accessLevel: AccessLevel, eventId: string, invitedBy: string) => {
+    try {
+      const newGuest: Guest = {
+        id: generateShortId(guests.map(g => g.id)),
+        eventId,
+        name,
+        company,
+        accessLevel,
+        checkedInAt: null,
+        invitedBy,
+      };
+      await addDoc(collection(db, 'guests'), newGuest);
+    } catch (err) {
+      console.error("Error adding guest to Firestore: ", err);
+      setError("No se pudo añadir al invitado.");
+    }
   };
 
-  const deleteGuest = (guestId: string) => {
-    setGuests(currentGuests => currentGuests.filter(g => g.id !== guestId));
-  };
+  const deleteGuest = async (guestId: string) => {
+    try {
+      const guestsQuery = query(collection(db, 'guests'), where('id', '==', guestId));
+      const guestsSnapshot = await getDocs(guestsQuery);
 
-  const checkInGuest = (guestId: string): CheckInResult => {
+      if (guestsSnapshot.empty) {
+        throw new Error("Guest not found for deletion");
+      }
+
+      const guestDocRef = guestsSnapshot.docs[0].ref;
+      await deleteDoc(guestDocRef);
+    } catch (err) {
+      console.error("Error deleting guest from Firestore: ", err);
+      setError("No se pudo eliminar al invitado.");
+    }
+  };
+  
+  const checkInGuest = async (guestId: string): Promise<CheckInResult> => {
     const normalizedGuestId = guestId.toUpperCase().trim();
-    const guest = guests.find(g => g.id === normalizedGuestId);
-
-    if (!guest) {
+    
+    try {
+      const guestsQuery = query(collection(db, 'guests'), where('id', '==', normalizedGuestId));
+      const guestsSnapshot = await getDocs(guestsQuery);
+  
+      if (guestsSnapshot.empty) {
+        return { status: 'NOT_FOUND', guest: null };
+      }
+  
+      const guestDoc = guestsSnapshot.docs[0];
+      const guestData = guestDoc.data();
+      const guest: Guest = { 
+        ...guestData,
+        checkedInAt: guestData.checkedInAt ? (guestData.checkedInAt as Timestamp).toDate() : null,
+      } as Guest;
+      
+      if (guest.checkedInAt) {
+        return { status: 'ALREADY_CHECKED_IN', guest };
+      }
+      
+      const guestDocRef = guestDoc.ref;
+      const checkInTime = new Date();
+      await updateDoc(guestDocRef, { checkedInAt: Timestamp.fromDate(checkInTime) });
+      
+      const updatedGuest = { ...guest, checkedInAt: checkInTime };
+  
+      return { status: 'SUCCESS', guest: updatedGuest };
+  
+    } catch (err) {
+      console.error("Error checking in guest with Firestore:", err);
+      setError("Error al procesar el check-in.");
       return { status: 'NOT_FOUND', guest: null };
     }
-
-    if (guest.checkedInAt) {
-      return { status: 'ALREADY_CHECKED_IN', guest };
-    }
-
-    const updatedGuest = { ...guest, checkedInAt: new Date() };
-    setGuests(currentGuests =>
-      currentGuests.map(g => (g.id === normalizedGuestId ? updatedGuest : g))
-    );
-
-    return { status: 'SUCCESS', guest: updatedGuest };
   };
 
-
   return (
-    <GuestContext.Provider value={{ events, guests, selectedEventId, isLoading, error, addEvent, selectEvent, deleteEvent, addGuest, deleteGuest, checkInGuest, clearError }}>
+    <GuestContext.Provider value={{ events, guests, selectedEventId, isLoading, isOffline, error, addEvent, selectEvent, deleteEvent, addGuest, deleteGuest, checkInGuest, clearError }}>
       {children}
     </GuestContext.Provider>
   );
