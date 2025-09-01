@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import { useGuests } from '../hooks/useGuests';
@@ -200,9 +201,9 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
 
   return (
     <div className="relative h-screen w-screen bg-black overflow-hidden">
-      {/* FIX: The 'onDecode' prop is not valid for the Scanner component. The correct prop is 'onResult', which provides a result object with a 'text' property. */}
+      {/* FIX: The 'onResult' prop is not valid for the Scanner component. The correct prop is 'onDecode', which provides the decoded text as a string. */}
       <Scanner
-        onResult={(result) => handleScan(result.text)}
+        onDecode={handleScan}
         onError={(error: any) => console.error(error?.message)}
         containerStyle={{ width: '100%', height: '100%', paddingTop: 0 }}
         videoStyle={{ width: '100%', height: '100%', objectFit: 'cover' }}
