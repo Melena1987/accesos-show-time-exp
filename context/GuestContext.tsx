@@ -22,7 +22,10 @@ const DATA_STORAGE_URL = 'https://api.npoint.io/4a34241e17d7a79b88a9';
 export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [events, setEvents] = useState<Event[]>([]);
   const [guests, setGuests] = useState<Guest[]>([]);
-  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(() => {
+    // Recupera el ID del evento seleccionado del localStorage para mejorar la experiencia de usuario al recargar.
+    return localStorage.getItem('selectedEventId');
+  });
   // Este indicador es crucial. Evita que la aplicación sobrescriba el estado remoto
   // con su estado inicial vacío antes de que se hayan cargado los datos remotos.
   const [isInitialLoadComplete, setIsInitialLoadComplete] = useState(false);
@@ -50,15 +53,16 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             
             setEvents(Array.isArray(storedEvents) ? storedEvents : []);
             setGuests(parsedGuests);
-
-            // Marcar la carga inicial como completa SÓLO después de una carga y análisis exitosos.
-            if (!isInitialLoadComplete) {
-                setIsInitialLoadComplete(true);
-            }
         }
       } catch (error) {
         console.error("Fallo al cargar o analizar datos del almacén remoto. Se reintentará.", error);
-        // No establecer isInitialLoadComplete como true en caso de error.
+      } finally {
+        // CORRECCIÓN CLAVE: Nos aseguramos de que la carga inicial se marque como completa
+        // incluso si falla, para que la aplicación pueda empezar a GUARDAR nuevos datos.
+        // Sin esto, si la carga inicial falla (p. ej., el almacén está vacío), no se guardará nada.
+        if (isMounted && !isInitialLoadComplete) {
+            setIsInitialLoadComplete(true);
+        }
       }
     };
     
@@ -69,14 +73,14 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         isMounted = false;
         clearInterval(intervalId);
     };
-  // Ejecutamos este efecto solo una vez. `isInitialLoadComplete` se omite intencionadamente
-  // del array de dependencias para evitar re-configurar el intervalo.
+  // Se deshabilita la regla del linter porque controlamos intencionadamente la ejecución de este efecto
+  // para que se ejecute solo una vez, manejando 'isInitialLoadComplete' internamente.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Efecto para guardar los datos en el almacén remoto cada vez que cambian.
   useEffect(() => {
-    // Guardar datos solo después de que la carga inicial se haya completado.
+    // No guardar datos hasta que el intento de carga inicial se haya completado.
     if (!isInitialLoadComplete) {
       return;
     }
@@ -97,6 +101,15 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     saveData();
   }, [events, guests, isInitialLoadComplete]);
+  
+  // Efecto para persistir el evento seleccionado en localStorage.
+  useEffect(() => {
+    if (selectedEventId) {
+      localStorage.setItem('selectedEventId', selectedEventId);
+    } else {
+      localStorage.removeItem('selectedEventId');
+    }
+  }, [selectedEventId]);
 
   const generateShortId = (existingIds: string[]): string => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
