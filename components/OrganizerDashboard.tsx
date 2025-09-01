@@ -193,15 +193,13 @@ const EventManager: React.FC = () => {
 }
 
 const OrganizerDashboard: React.FC<OrganizerDashboardProps> = ({ onLogout, loggedInUser }) => {
-  const { guests, events, selectedEventId, isLoading, selectEvent, deleteGuest } = useGuests();
+  const { guests, events, selectedEventId, isLoading, error, clearError, selectEvent, deleteGuest } = useGuests();
   const invitationRef = useRef<HTMLDivElement>(null);
   const [selectedGuest, setSelectedGuest] = useState<Guest | null>(null);
 
   const selectedEvent = events.find(e => e.id === selectedEventId);
 
   useEffect(() => {
-    // If there's a selectedEventId but it doesn't correspond to any existing event,
-    // and data is not loading, reset the selection. This can happen if an event is deleted.
     if (selectedEventId && !selectedEvent && !isLoading) {
       selectEvent(null);
     }
@@ -210,12 +208,11 @@ const OrganizerDashboard: React.FC<OrganizerDashboardProps> = ({ onLogout, logge
   useEffect(() => {
     if (selectedGuest && invitationRef.current) {
       const element = invitationRef.current;
-      // Use a small delay to ensure the QR code canvas and any web fonts have rendered.
       const timer = setTimeout(async () => {
         try {
           const dataUrl = await toPng(element, { 
             cacheBust: true,
-            pixelRatio: 2 // Improve image quality on high-DPI screens
+            pixelRatio: 2
           });
           const link = document.createElement('a');
           link.download = `invitacion-${selectedGuest.name.replace(/\s+/g, '-')}.png`;
@@ -225,7 +222,6 @@ const OrganizerDashboard: React.FC<OrganizerDashboardProps> = ({ onLogout, logge
           console.error('Failed to generate invitation image', err);
           alert('Error: No se pudo generar la imagen de la invitación.');
         } finally {
-          // Reset the selected guest to hide the component and allow generating again.
           setSelectedGuest(null);
         }
       }, 100);
@@ -235,7 +231,6 @@ const OrganizerDashboard: React.FC<OrganizerDashboardProps> = ({ onLogout, logge
   }, [selectedGuest]);
 
   const handleGenerateInvitation = (guest: Guest) => {
-    // Simply set the guest to trigger the useEffect that handles image generation.
     setSelectedGuest(guest);
   };
   
@@ -265,6 +260,15 @@ const OrganizerDashboard: React.FC<OrganizerDashboardProps> = ({ onLogout, logge
   return (
     <>
       <div className="min-h-screen bg-gray-900 p-4 md:p-8">
+        {error && (
+            <div className="bg-red-800 border border-red-600 text-white px-4 py-3 rounded-lg relative mb-6" role="alert">
+                <strong className="font-bold">Error: </strong>
+                <span className="block sm:inline">{error}</span>
+                <button onClick={clearError} className="absolute top-0 bottom-0 right-0 px-4 py-3" aria-label="Cerrar">
+                    <span className="text-2xl">&times;</span>
+                </button>
+            </div>
+        )}
         <header className="flex justify-between items-center mb-8">
             <div>
               <h1 className="text-3xl font-bold">Panel del Organizador</h1>
@@ -299,7 +303,6 @@ const OrganizerDashboard: React.FC<OrganizerDashboardProps> = ({ onLogout, logge
         </main>
       </div>
       
-      {/* This component is rendered off-screen and used as a template for the image generation */}
       {selectedGuest && selectedEvent && (
         <div className="fixed -top-full -left-full">
           <Invitation guest={selectedGuest} eventName={selectedEvent.name} ref={invitationRef} />

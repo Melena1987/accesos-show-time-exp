@@ -9,30 +9,22 @@ interface AdminDashboardProps {
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
-  const { events, guests, isLoading, deleteEvent } = useGuests();
+  const { events, guests, isLoading, error, clearError, deleteEvent } = useGuests();
 
   const handleExportToCSV = (event: Event, eventGuests: Guest[]) => {
-    // 1. Change header to avoid SYLK error
     const headers = ["ID Invitado", "Nombre", "Empresa", "Nivel Acceso", "Invitado Por", "Hora Admisión"];
-    
-    // 2. Use semicolon as separator for better Excel compatibility in many regions
     const separator = ';';
-
     const rows = eventGuests.map(guest => [
       guest.id,
-      `"${guest.name.replace(/"/g, '""')}"`, // Escape double quotes
+      `"${guest.name.replace(/"/g, '""')}"`,
       `"${guest.company.replace(/"/g, '""')}"`,
       guest.accessLevel,
       `"${guest.invitedBy || 'N/A'}"`,
       guest.checkedInAt ? `"${new Date(guest.checkedInAt).toLocaleString('es-ES')}"` : '"No admitido"'
     ].join(separator));
-
-    // 3. Add BOM for Excel UTF-8 compatibility and join headers/rows
     const csvString = '\uFEFF' + [headers.join(separator), ...rows].join('\n');
-    
     const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
-    
     const link = document.createElement("a");
     link.setAttribute("href", url);
     link.setAttribute("download", `invitados-${event.name.replace(/\s+/g, '_')}.csv`);
@@ -68,6 +60,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
 
   return (
     <div className="min-h-screen bg-gray-900 p-4 md:p-8">
+      {error && (
+            <div className="bg-red-800 border border-red-600 text-white px-4 py-3 rounded-lg relative mb-6" role="alert">
+                <strong className="font-bold">Error: </strong>
+                <span className="block sm:inline">{error}</span>
+                <button onClick={clearError} className="absolute top-0 bottom-0 right-0 px-4 py-3" aria-label="Cerrar">
+                    <span className="text-2xl">&times;</span>
+                </button>
+            </div>
+        )}
       <header className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold">Panel de Administración</h1>
         <button 

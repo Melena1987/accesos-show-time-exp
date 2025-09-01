@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import { useGuests } from '../hooks/useGuests';
@@ -12,7 +11,7 @@ interface ControllerViewProps {
 }
 
 const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
-  const { checkInGuest, guests, events, selectedEventId, selectEvent, isLoading } = useGuests();
+  const { checkInGuest, guests, events, selectedEventId, selectEvent, isLoading, error } = useGuests();
   const [result, setResult] = useState<CheckInResult | null>(null);
   const [showManualInput, setShowManualInput] = useState(false);
   const [manualId, setManualId] = useState('');
@@ -23,16 +22,12 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
   const selectedEvent = events.find(e => e.id === selectedEventId);
 
   useEffect(() => {
-    // Este efecto se ejecuta una vez tras la carga inicial de datos para establecer el estado correcto.
     if (!isLoading && !initialCheckDone) {
       if (events.length > 1) {
-        // Si hay múltiples eventos, se fuerza la selección borrando cualquier selección previa de otra vista.
         selectEvent(null);
       } else if (events.length === 1) {
-        // Si hay exactamente un evento, se selecciona automáticamente.
         selectEvent(events[0].id);
       }
-      // Si hay 0 eventos, selectedEventId se mantendrá nulo, mostrando el mensaje correcto.
       setInitialCheckDone(true);
     }
   }, [isLoading, events, selectEvent, initialCheckDone]);
@@ -167,6 +162,20 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
     );
   }
   
+  if (error) {
+     return (
+        <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-4">
+             <div className="w-full max-w-lg text-center bg-gray-800 p-8 md:p-10 rounded-2xl shadow-lg">
+                <h2 className="text-2xl font-bold text-red-400 mb-2">Error de Carga</h2>
+                <p className="text-gray-300">{error}</p>
+                <button onClick={() => window.location.reload()} className="mt-6 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md">
+                    Reintentar
+                </button>
+            </div>
+        </div>
+     );
+  }
+
   if (!selectedEventId) {
     return (
         <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-4">
@@ -204,11 +213,11 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
 
   return (
     <div className="relative h-screen w-screen bg-black overflow-hidden">
-      {/* FIX: The 'onDecode' prop is not valid for this version of the Scanner component. The correct prop is 'onResult', which provides a result object. We extract the text from it. */}
+      {/* FIX: The 'onResult' prop for the Scanner component is deprecated. Replaced with 'onDecode', and updated the callback to handle a string result directly. */}
       <Scanner
-        onResult={(result) => {
+        onDecode={(result) => {
           if (result) {
-            handleScan(result.text);
+            handleScan(result);
           }
         }}
         onError={(error: any) => console.error(error?.message)}

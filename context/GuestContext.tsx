@@ -6,12 +6,14 @@ interface GuestContextType {
   guests: Guest[];
   selectedEventId: string | null;
   isLoading: boolean;
+  error: string | null;
   addEvent: (name: string) => void;
   selectEvent: (eventId: string | null) => void;
   deleteEvent: (eventId: string) => void;
   addGuest: (name: string, company: string, accessLevel: AccessLevel, eventId: string, invitedBy: string) => void;
   deleteGuest: (guestId: string) => void;
   checkInGuest: (guestId: string) => CheckInResult;
+  clearError: () => void;
 }
 
 export const GuestContext = createContext<GuestContextType | undefined>(undefined);
@@ -29,9 +31,11 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     return localStorage.getItem('selectedEventId');
   });
   const [isLoading, setIsLoading] = useState(true);
-  const hasLoaded = useRef(false); // Ref to track if initial load is complete.
+  const [error, setError] = useState<string | null>(null);
+  const hasLoaded = useRef(false);
 
-  // Efecto para cargar los datos iniciales del almacén remoto.
+  const clearError = () => setError(null);
+
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -51,44 +55,53 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 setEvents(Array.isArray(storedEvents) ? storedEvents : []);
                 setGuests(parsedGuests);
             }
+            hasLoaded.current = true;
+        } else {
+            throw new Error(`Error al cargar los datos: ${response.statusText}`);
         }
-      } catch (error) {
-        console.error("Fallo al cargar datos del almacén remoto. Se continuará con el estado vacío.", error);
+      } catch (err) {
+        console.error("Fallo al cargar datos del almacén remoto.", err);
+        setError("No se pudieron cargar los datos. Comprueba tu conexión e inténtalo de nuevo.");
       } finally {
         setIsLoading(false);
-        hasLoaded.current = true; // Mark loading as complete here.
       }
     };
     
     loadData();
   }, []);
   
-  // Efecto para persistir los datos en el almacén remoto CADA VEZ que cambien.
   useEffect(() => {
-    // Solo guardar si la carga inicial de datos ha finalizado.
-    // Esto previene la condición de carrera donde se guardaba un estado vacío al inicio.
     if (!hasLoaded.current) {
       return;
     }
 
     const saveData = async () => {
+      // No guardar si el estado es el inicial vacío, podría ser por un error de carga
+      if (events.length === 0 && guests.length === 0 && !localStorage.getItem('showtime_has_data')) {
+         return;
+      }
+      localStorage.setItem('showtime_has_data', 'true');
+
       try {
-        await fetch(DATA_STORAGE_URL, {
+        const response = await fetch(DATA_STORAGE_URL, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ events, guests }),
         });
-      } catch (error) {
-        console.error("Fallo al guardar datos en el almacén remoto:", error);
+        if (!response.ok) {
+            throw new Error(`Error al guardar los datos: ${response.statusText}`);
+        }
+      } catch (err) {
+        console.error("Fallo al guardar datos en el almacén remoto:", err);
+        setError("El último cambio no se pudo guardar. Comprueba tu conexión.");
       }
     };
 
     saveData();
-  }, [events, guests]); // Depende únicamente de los datos para ejecutarse.
+  }, [events, guests]);
 
-  // Efecto para persistir el evento seleccionado en localStorage.
   useEffect(() => {
     if (selectedEventId) {
       localStorage.setItem('selectedEventId', selectedEventId);
@@ -123,11 +136,8 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   };
 
   const deleteEvent = (eventId: string) => {
-    // Eliminar el evento
     setEvents(currentEvents => currentEvents.filter(e => e.id !== eventId));
-    // Eliminar todos los invitados asociados a ese evento
     setGuests(currentGuests => currentGuests.filter(g => g.eventId !== eventId));
-    // Si el evento eliminado era el seleccionado, deseleccionarlo
     if (selectedEventId === eventId) {
       setSelectedEventId(null);
     }
@@ -152,32 +162,39 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const checkInGuest = (guestId: string): CheckInResult => {
     const normalizedGuestId = guestId.toUpperCase().trim();
-    const guest = guests.find(g => g.id === normalizedGuestId);
-
-    if (!guest) {
-        return { status: 'NOT_FOUND', guest: null };
-    }
-
-    if (guest.checkedInAt) {
-        return { status: 'ALREADY_CHECKED_IN', guest };
-    }
-
-    const updatedGuest = { ...guest, checkedInAt: new Date() };
+    let guestToUpdate: Guest | undefined;
     
     setGuests(currentGuests => {
-      const guestIndex = currentGuests.findIndex(g => g.id === normalizedGuestId);
-      if (guestIndex === -1) return currentGuests; // No debería ocurrir
-      const updatedGuests = [...currentGuests];
-      updatedGuests[guestIndex] = updatedGuest;
-      return updatedGuests;
+        const guestIndex = currentGuests.findIndex(g => g.id === normalizedGuestId);
+        if (guestIndex === -1) {
+            guestToUpdate = undefined;
+            return currentGuests;
+        }
+
+        const guest = currentGuests[guestIndex];
+        if (guest.checkedInAt) {
+            guestToUpdate = guest;
+            return currentGuests; 
+        }
+
+        guestToUpdate = { ...guest, checkedInAt: new Date() };
+        const updatedGuests = [...currentGuests];
+        updatedGuests[guestIndex] = guestToUpdate;
+        return updatedGuests;
     });
 
-    return { status: 'SUCCESS', guest: updatedGuest };
+    if (!guestToUpdate) {
+        return { status: 'NOT_FOUND', guest: null };
+    }
+    if (guestToUpdate.checkedInAt && (new Date().getTime() - new Date(guestToUpdate.checkedInAt).getTime()) > 1000) {
+        return { status: 'ALREADY_CHECKED_IN', guest: guestToUpdate };
+    }
+    return { status: 'SUCCESS', guest: guestToUpdate };
   };
 
 
   return (
-    <GuestContext.Provider value={{ events, guests, selectedEventId, isLoading, addEvent, selectEvent, deleteEvent, addGuest, deleteGuest, checkInGuest }}>
+    <GuestContext.Provider value={{ events, guests, selectedEventId, isLoading, error, addEvent, selectEvent, deleteEvent, addGuest, deleteGuest, checkInGuest, clearError }}>
       {children}
     </GuestContext.Provider>
   );
