@@ -5,6 +5,7 @@ import { Guest, AccessLevel } from '../types';
 import Invitation from './Invitation';
 import QrCodeIcon from './icons/QrCodeIcon';
 import HomeIcon from './icons/HomeIcon';
+import TrashIcon from './icons/TrashIcon';
 
 interface OrganizerDashboardProps {
   onLogout: () => void;
@@ -77,7 +78,7 @@ const GuestForm: React.FC<{ eventId: string; organizerName: string; }> = ({ even
   );
 };
 
-const GuestList: React.FC<{ guests: Guest[], onGenerateInvitation: (guest: Guest) => void }> = ({ guests, onGenerateInvitation }) => {
+const GuestList: React.FC<{ guests: Guest[], onGenerateInvitation: (guest: Guest) => void, onDeleteGuest: (guestId: string) => void }> = ({ guests, onGenerateInvitation, onDeleteGuest }) => {
   return (
     <div className="bg-gray-800 p-6 rounded-lg shadow-md mt-8 md:mt-0">
       <h2 className="text-xl font-bold mb-4">Lista de Invitados ({guests.length})</h2>
@@ -92,13 +93,27 @@ const GuestList: React.FC<{ guests: Guest[], onGenerateInvitation: (guest: Guest
                 <p className="text-sm text-gray-400">{guest.company} - Nivel {guest.accessLevel}</p>
                 {guest.checkedInAt && <p className="text-xs text-green-400">Admitido: {new Date(guest.checkedInAt).toLocaleTimeString()}</p>}
               </div>
-              <button
-                onClick={() => onGenerateInvitation(guest)}
-                className="flex items-center space-x-2 bg-gray-600 hover:bg-indigo-500 text-white text-sm font-semibold py-2 px-3 rounded-md transition duration-300"
-              >
-                <QrCodeIcon className="w-4 h-4" />
-                <span>Invitación</span>
-              </button>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => onGenerateInvitation(guest)}
+                  className="flex items-center space-x-2 bg-gray-600 hover:bg-indigo-500 text-white text-sm font-semibold py-2 px-3 rounded-md transition duration-300"
+                  aria-label={`Generar invitación para ${guest.name}`}
+                >
+                  <QrCodeIcon className="w-4 h-4" />
+                  <span>Invitación</span>
+                </button>
+                <button
+                  onClick={() => {
+                    if (window.confirm(`¿Estás seguro de que quieres eliminar a ${guest.name}?`)) {
+                      onDeleteGuest(guest.id);
+                    }
+                  }}
+                  className="p-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition duration-300"
+                  aria-label={`Eliminar a ${guest.name}`}
+                >
+                  <TrashIcon className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           ))
         )}
@@ -108,7 +123,7 @@ const GuestList: React.FC<{ guests: Guest[], onGenerateInvitation: (guest: Guest
 };
 
 const EventManager: React.FC = () => {
-    const { events, selectedEventId, selectEvent, addEvent } = useGuests();
+    const { events, selectedEventId, selectEvent, addEvent, deleteEvent } = useGuests();
     const [newEventName, setNewEventName] = useState('');
 
     const handleAddEvent = (e: React.FormEvent) => {
@@ -119,23 +134,42 @@ const EventManager: React.FC = () => {
         }
     }
     
+    const handleDeleteEvent = () => {
+        if (!selectedEventId) return;
+        const eventToDelete = events.find(e => e.id === selectedEventId);
+        if (eventToDelete && window.confirm(`¿Estás seguro de que quieres eliminar el evento "${eventToDelete.name}" y todos sus invitados? Esta acción no se puede deshacer.`)) {
+            deleteEvent(selectedEventId);
+        }
+    }
+
     return (
         <div className="bg-gray-800 p-6 rounded-lg shadow-md mb-8">
             <h2 className="text-xl font-bold mb-4">Gestor de Eventos</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
-                <div>
-                    <label htmlFor="event-selector" className="block text-sm font-medium text-gray-300">Seleccionar Evento</label>
-                    <select 
-                        id="event-selector"
-                        value={selectedEventId || ''}
-                        onChange={(e) => selectEvent(e.target.value || null)}
-                        className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                    >
-                        <option value="">-- Elige un evento --</option>
-                        {events.map(event => (
-                            <option key={event.id} value={event.id}>{event.name}</option>
-                        ))}
-                    </select>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+                <div className="flex items-end space-x-2">
+                    <div className="flex-grow">
+                        <label htmlFor="event-selector" className="block text-sm font-medium text-gray-300">Seleccionar Evento</label>
+                        <select 
+                            id="event-selector"
+                            value={selectedEventId || ''}
+                            onChange={(e) => selectEvent(e.target.value || null)}
+                            className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-2 px-3 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 h-[42px]"
+                        >
+                            <option value="">-- Elige un evento --</option>
+                            {events.map(event => (
+                                <option key={event.id} value={event.id}>{event.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                    {selectedEventId && (
+                        <button
+                            onClick={handleDeleteEvent}
+                            className="p-2 h-[42px] bg-red-600 hover:bg-red-700 text-white rounded-md transition duration-300 flex-shrink-0"
+                            aria-label="Eliminar evento seleccionado"
+                        >
+                            <TrashIcon className="w-5 h-5" />
+                        </button>
+                    )}
                 </div>
                 <form onSubmit={handleAddEvent} className="flex items-end space-x-2">
                     <div className="flex-grow">
@@ -159,7 +193,7 @@ const EventManager: React.FC = () => {
 }
 
 const OrganizerDashboard: React.FC<OrganizerDashboardProps> = ({ onLogout, loggedInUser }) => {
-  const { guests, events, selectedEventId, isLoading, selectEvent } = useGuests();
+  const { guests, events, selectedEventId, isLoading, selectEvent, deleteGuest } = useGuests();
   const invitationRef = useRef<HTMLDivElement>(null);
   const [selectedGuest, setSelectedGuest] = useState<Guest | null>(null);
 
@@ -252,7 +286,7 @@ const OrganizerDashboard: React.FC<OrganizerDashboardProps> = ({ onLogout, logge
                             <GuestForm eventId={selectedEvent.id} organizerName={loggedInUser} />
                         </div>
                         <div className="md:col-span-2">
-                            <GuestList guests={currentGuests} onGenerateInvitation={handleGenerateInvitation} />
+                            <GuestList guests={currentGuests} onGenerateInvitation={handleGenerateInvitation} onDeleteGuest={deleteGuest} />
                         </div>
                     </div>
                 </div>

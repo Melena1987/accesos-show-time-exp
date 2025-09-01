@@ -2,13 +2,14 @@ import React from 'react';
 import { useGuests } from '../hooks/useGuests';
 import { Event, Guest } from '../types';
 import DownloadIcon from './icons/DownloadIcon';
+import TrashIcon from './icons/TrashIcon';
 
 interface AdminDashboardProps {
   onLogout: () => void;
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
-  const { events, guests, isLoading } = useGuests();
+  const { events, guests, isLoading, deleteEvent } = useGuests();
 
   const handleExportToCSV = (event: Event, eventGuests: Guest[]) => {
     // 1. Change header to avoid SYLK error
@@ -39,6 +40,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     link.click();
     document.body.removeChild(link);
   };
+
+  const handleDeleteEvent = (event: Event) => {
+    if (window.confirm(`¿Estás seguro de que quieres eliminar el evento "${event.name}" y todos sus invitados? Esta acción no se puede deshacer.`)) {
+        deleteEvent(event.id);
+    }
+  }
 
   if (isLoading) {
     return (
@@ -83,14 +90,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
                     <p className="text-gray-400 text-4xl font-semibold">{eventGuests.length}</p>
                     <p className="text-gray-400">Invitados Registrados</p>
                   </div>
-                  <button 
-                    onClick={() => handleExportToCSV(event, eventGuests)}
-                    disabled={eventGuests.length === 0}
-                    className="mt-6 w-full flex items-center justify-center space-x-2 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md transition duration-300 disabled:bg-gray-600 disabled:cursor-not-allowed"
-                  >
-                    <DownloadIcon className="w-5 h-5" />
-                    <span>Descargar Lista (.csv)</span>
-                  </button>
+                  <div className="mt-6 flex items-center space-x-2">
+                    <button 
+                      onClick={() => handleExportToCSV(event, eventGuests)}
+                      disabled={eventGuests.length === 0}
+                      className="flex-grow flex items-center justify-center space-x-2 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md transition duration-300 disabled:bg-gray-600 disabled:cursor-not-allowed"
+                    >
+                      <DownloadIcon className="w-5 h-5" />
+                      <span>Descargar Lista (.csv)</span>
+                    </button>
+                    <button
+                        onClick={() => handleDeleteEvent(event)}
+                        className="flex-shrink-0 p-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-md transition duration-300"
+                        aria-label={`Eliminar evento ${event.name}`}
+                    >
+                        <TrashIcon className="w-5 h-5" />
+                    </button>
+                  </div>
                 </div>
               );
             })}

@@ -8,7 +8,9 @@ interface GuestContextType {
   isLoading: boolean;
   addEvent: (name: string) => void;
   selectEvent: (eventId: string | null) => void;
+  deleteEvent: (eventId: string) => void;
   addGuest: (name: string, company: string, accessLevel: AccessLevel, eventId: string, invitedBy: string) => void;
+  deleteGuest: (guestId: string) => void;
   checkInGuest: (guestId: string) => CheckInResult;
 }
 
@@ -120,6 +122,17 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     setSelectedEventId(eventId);
   };
 
+  const deleteEvent = (eventId: string) => {
+    // Eliminar el evento
+    setEvents(currentEvents => currentEvents.filter(e => e.id !== eventId));
+    // Eliminar todos los invitados asociados a ese evento
+    setGuests(currentGuests => currentGuests.filter(g => g.eventId !== eventId));
+    // Si el evento eliminado era el seleccionado, deseleccionarlo
+    if (selectedEventId === eventId) {
+      setSelectedEventId(null);
+    }
+  };
+
   const addGuest = (name: string, company: string, accessLevel: AccessLevel, eventId: string, invitedBy: string) => {
     const newGuest: Guest = {
       id: generateShortId(guests.map(g => g.id)),
@@ -131,6 +144,10 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       invitedBy,
     };
     setGuests(currentGuests => [...currentGuests, newGuest]);
+  };
+
+  const deleteGuest = (guestId: string) => {
+    setGuests(currentGuests => currentGuests.filter(g => g.id !== guestId));
   };
 
   const checkInGuest = (guestId: string): CheckInResult => {
@@ -160,7 +177,7 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
 
   return (
-    <GuestContext.Provider value={{ events, guests, selectedEventId, isLoading, addEvent, selectEvent, addGuest, checkInGuest }}>
+    <GuestContext.Provider value={{ events, guests, selectedEventId, isLoading, addEvent, selectEvent, deleteEvent, addGuest, deleteGuest, checkInGuest }}>
       {children}
     </GuestContext.Provider>
   );
