@@ -18,21 +18,24 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
   const [manualId, setManualId] = useState('');
   const [manualError, setManualError] = useState('');
   const resultTimeoutRef = useRef<number | null>(null);
+  const [initialCheckDone, setInitialCheckDone] = useState(false);
 
   const selectedEvent = events.find(e => e.id === selectedEventId);
 
   useEffect(() => {
-    // Si el evento seleccionado (posiblemente desde localStorage) ya no existe, límpialo.
-    if (!isLoading && selectedEventId && !selectedEvent) {
-      selectEvent(null);
-      return;
+    // Este efecto se ejecuta una vez tras la carga inicial de datos para establecer el estado correcto.
+    if (!isLoading && !initialCheckDone) {
+      if (events.length > 1) {
+        // Si hay múltiples eventos, se fuerza la selección borrando cualquier selección previa de otra vista.
+        selectEvent(null);
+      } else if (events.length === 1) {
+        // Si hay exactamente un evento, se selecciona automáticamente.
+        selectEvent(events[0].id);
+      }
+      // Si hay 0 eventos, selectedEventId se mantendrá nulo, mostrando el mensaje correcto.
+      setInitialCheckDone(true);
     }
-
-    // Si solo hay un evento disponible y ninguno está seleccionado, lo selecciona automáticamente.
-    if (!isLoading && !selectedEventId && events.length === 1) {
-      selectEvent(events[0].id);
-    }
-  }, [isLoading, events, selectedEventId, selectEvent, selectedEvent]);
+  }, [isLoading, events, selectEvent, initialCheckDone]);
 
   const clearResult = useCallback(() => {
     setResult(null);
@@ -176,7 +179,7 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
             </header>
             <div className="w-full max-w-lg text-center bg-gray-800 p-8 md:p-10 rounded-2xl shadow-lg">
                 <h2 className="text-2xl font-bold text-white mb-2">Seleccionar Evento</h2>
-                {events.length > 1 ? (
+                {events.length > 0 ? (
                     <>
                         <p className="text-gray-400 mb-8">Elige el evento que quieres controlar para continuar.</p>
                         <div className="space-y-3">
@@ -201,9 +204,13 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
 
   return (
     <div className="relative h-screen w-screen bg-black overflow-hidden">
-      {/* FIX: The 'onResult' prop is not valid for the Scanner component. The correct prop is 'onDecode', which provides the decoded text as a string. */}
+      {/* FIX: The 'onDecode' prop is not valid for this version of the Scanner component. The correct prop is 'onResult', which provides a result object. We extract the text from it. */}
       <Scanner
-        onDecode={handleScan}
+        onResult={(result) => {
+          if (result) {
+            handleScan(result.text);
+          }
+        }}
         onError={(error: any) => console.error(error?.message)}
         containerStyle={{ width: '100%', height: '100%', paddingTop: 0 }}
         videoStyle={{ width: '100%', height: '100%', objectFit: 'cover' }}
