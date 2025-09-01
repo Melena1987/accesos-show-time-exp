@@ -4,6 +4,7 @@ import { useGuests } from '../hooks/useGuests';
 import { CheckInResult, Guest } from '../types';
 import CheckIcon from './icons/CheckIcon';
 import WarningIcon from './icons/WarningIcon';
+import HomeIcon from './icons/HomeIcon';
 
 interface ControllerViewProps {
   onLogout: () => void;
@@ -163,8 +164,9 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
         <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-4">
             <header className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center">
                 <h1 className="text-2xl font-bold">Control de Acceso</h1>
-                <button onClick={onLogout} className="bg-red-600 hover:bg-red-700 font-bold py-2 px-4 rounded-md transition duration-300">
-                    Salir
+                <button onClick={onLogout} className="flex items-center space-x-2 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition duration-300">
+                    <HomeIcon className="w-5 h-5" />
+                    <span>Menú Principal</span>
                 </button>
             </header>
             <div className="text-center bg-gray-800 p-10 rounded-lg max-w-lg w-full">
@@ -190,9 +192,9 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
 
   return (
     <div className="relative h-screen w-screen bg-black overflow-hidden">
-      {/* FIX: The 'onResult' prop is not available in this version of the scanner library. It has been replaced with 'onDecode', which returns the decoded text as a string. */}
+      {/* FIX: The 'onDecode' prop is not available in the installed version of the scanner library. Using 'onResult' and extracting the scanned text from the result object. */}
       <Scanner
-        onDecode={(result) => handleScan(result, null)}
+        onResult={(result) => handleScan(result.text, null)}
         onError={(error) => handleScan(null, error)}
         containerStyle={{ width: '100%', height: '100%', paddingTop: 0 }}
         videoStyle={{ width: '100%', height: '100%', objectFit: 'cover' }}
@@ -205,8 +207,9 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
             <h1 className="text-2xl font-bold text-white shadow-md">Control de Acceso</h1>
             <p className="text-indigo-300 font-semibold shadow-md truncate max-w-xs">{selectedEvent?.name}</p>
         </div>
-        <button onClick={onLogout} className="bg-red-600/80 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-md transition duration-300 backdrop-blur-sm flex-shrink-0">
-          Salir
+        <button onClick={onLogout} className="flex items-center space-x-2 bg-gray-700/80 hover:bg-gray-600/80 text-white font-bold py-2 px-4 rounded-md transition duration-300 backdrop-blur-sm flex-shrink-0">
+          <HomeIcon className="w-5 h-5" />
+          <span>Menú Principal</span>
         </button>
       </header>
 
