@@ -182,9 +182,9 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
 
   return (
     <div className="relative h-screen w-screen bg-black overflow-hidden">
-      {/* FIX: The `onResult` prop is not valid for this version of `@yudiel/react-qr-scanner`. The correct prop is `onDecode`, which passes the scanned text as a string. */}
+      {/* FIX: The 'onDecode' prop from a previous version of '@yudiel/react-qr-scanner' is no longer valid. It has been replaced by 'onResult', which provides a result object instead of a raw string. We now call `result.getText()` to pass the scanned string to the handler. */}
       <Scanner
-        onDecode={(result) => handleScan(result, null)}
+        onResult={(result) => handleScan(result.getText(), null)}
         onError={(error) => handleScan(null, error)}
         containerStyle={{ width: '100%', height: '100%', paddingTop: 0 }}
         videoStyle={{ width: '100%', height: '100%', objectFit: 'cover' }}
