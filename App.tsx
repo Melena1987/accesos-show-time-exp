@@ -15,15 +15,39 @@ interface AuthState {
   username: string | null;
 }
 
+const AUTH_STORAGE_KEY = 'showtime-auth-session';
+
 const App: React.FC = () => {
-  const [auth, setAuth] = useState<AuthState>({ role: UserRole.NONE, username: null });
+  const [auth, setAuth] = useState<AuthState>(() => {
+    try {
+      const storedAuth = localStorage.getItem(AUTH_STORAGE_KEY);
+      if (storedAuth) {
+        const parsedAuth = JSON.parse(storedAuth);
+        // Basic validation
+        if (Object.values(UserRole).includes(parsedAuth.role) && parsedAuth.username) {
+            return parsedAuth;
+        }
+      }
+    } catch (error) {
+      console.error("Failed to parse auth from localStorage", error);
+      localStorage.removeItem(AUTH_STORAGE_KEY);
+    }
+    return { role: UserRole.NONE, username: null };
+  });
 
   const handleLogin = (role: UserRole, username: string) => {
-    setAuth({ role, username });
+    const newAuth = { role, username };
+    setAuth(newAuth);
+    try {
+        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(newAuth));
+    } catch (error) {
+        console.error("Failed to save auth to localStorage", error);
+    }
   };
   
   const handleLogout = () => {
     setAuth({ role: UserRole.NONE, username: null });
+    localStorage.removeItem(AUTH_STORAGE_KEY);
   };
 
   return (
@@ -31,9 +55,9 @@ const App: React.FC = () => {
       <HashRouter>
         <div className="min-h-screen bg-gray-900 text-gray-100">
           <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
-            <Route path="/admin/login" element={<AdminLoginPage onLogin={handleLogin} />} />
+            <Route path="/" element={auth.role === UserRole.NONE ? <LandingPage /> : <Navigate to={`/${auth.role}`} />} />
+            <Route path="/login" element={auth.role === UserRole.NONE ? <LoginPage onLogin={handleLogin} /> : <Navigate to={`/${auth.role}`} />} />
+            <Route path="/admin/login" element={auth.role === UserRole.NONE ? <AdminLoginPage onLogin={handleLogin} /> : <Navigate to="/admin" />} />
             <Route
               path="/organizer"
               element={
