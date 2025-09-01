@@ -173,21 +173,25 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
                     <span>Menú Principal</span>
                 </button>
             </header>
-            <div className="text-center bg-gray-800 p-10 rounded-lg max-w-lg w-full">
-                <h2 className="text-xl font-semibold text-gray-300 mb-4">Selecciona un Evento</h2>
-                {events.length > 0 ? (
-                    <select
-                        value={selectedEventId || ''}
-                        onChange={(e) => selectEvent(e.target.value || null)}
-                        className="w-full bg-gray-700 border border-gray-600 rounded-md shadow-sm py-3 px-4 text-white focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                    >
-                        <option value="">-- Elige un evento --</option>
-                        {events.map(event => (
-                            <option key={event.id} value={event.id}>{event.name}</option>
-                        ))}
-                    </select>
+            <div className="w-full max-w-lg text-center bg-gray-800 p-8 md:p-10 rounded-2xl shadow-lg">
+                <h2 className="text-2xl font-bold text-white mb-2">Seleccionar Evento</h2>
+                {events.length > 1 ? (
+                    <>
+                        <p className="text-gray-400 mb-8">Elige el evento que quieres controlar para continuar.</p>
+                        <div className="space-y-3">
+                            {events.map(event => (
+                                <button
+                                    key={event.id}
+                                    onClick={() => selectEvent(event.id)}
+                                    className="w-full text-center p-4 bg-gray-700 hover:bg-indigo-600 rounded-lg transition-colors duration-200 text-lg font-semibold"
+                                >
+                                    {event.name}
+                                </button>
+                            ))}
+                        </div>
+                    </>
                 ) : (
-                    <p className="text-gray-400 mt-2">No hay eventos disponibles. Pídele a un organizador que cree uno.</p>
+                    <p className="text-gray-400 mt-4">No hay eventos disponibles. Pídele a un organizador que cree uno.</p>
                 )}
             </div>
         </div>
@@ -196,9 +200,9 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
 
   return (
     <div className="relative h-screen w-screen bg-black overflow-hidden">
-      {/* FIX: The 'onResult' prop is not valid. Switched to 'onDecode' which provides the QR content as a string, matching the 'handleScan' function signature. */}
+      {/* FIX: The 'onDecode' prop is not valid for the Scanner component. The correct prop is 'onResult', which provides a result object with a 'text' property. */}
       <Scanner
-        onDecode={handleScan}
+        onResult={(result) => handleScan(result.text)}
         onError={(error: any) => console.error(error?.message)}
         containerStyle={{ width: '100%', height: '100%', paddingTop: 0 }}
         videoStyle={{ width: '100%', height: '100%', objectFit: 'cover' }}
