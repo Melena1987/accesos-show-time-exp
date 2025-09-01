@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import { useGuests } from '../hooks/useGuests';
@@ -29,7 +30,6 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
     };
   }, []);
 
-  // FIX: Changed the type of 'error' from 'Error | null' to 'unknown' to correctly handle the error type from the scanner's onError prop.
   const handleScan = useCallback((decodedText: string | null, error: unknown | null) => {
     if (resultTimeoutRef.current) {
       clearTimeout(resultTimeoutRef.current);
@@ -63,7 +63,6 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
     
     if (error) {
       // Don't show an error for normal scanning operation, only log it.
-      // FIX: Added a type check to safely access the 'message' property from the error object.
       if (error instanceof Error) {
         console.info(error.message);
       }
@@ -184,9 +183,9 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
 
   return (
     <div className="relative h-screen w-screen bg-black overflow-hidden">
-      {/* FIX: The 'onDecode' prop does not exist on the scanner component. Replaced with 'onResult' which passes a result object. The callback now extracts the 'rawValue' string from the result. */}
+      {/* FIX: The QR scanner result object contains a 'text' property, not 'rawValue'. Using the correct property prevents a runtime crash. */}
       <Scanner
-        onResult={(result) => handleScan(result.rawValue, null)}
+        onResult={(result) => handleScan(result.text, null)}
         onError={(error) => handleScan(null, error)}
         containerStyle={{ width: '100%', height: '100%', paddingTop: 0 }}
         videoStyle={{ width: '100%', height: '100%', objectFit: 'cover' }}

@@ -38,18 +38,30 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     try {
       const storedData = localStorage.getItem(DATA_STORAGE_KEY);
       if (storedData) {
-        const { events: storedEvents, guests: storedGuests } = JSON.parse(storedData);
+        const parsed = JSON.parse(storedData);
         
-        const parsedGuests = (storedGuests || []).map((g: any) => ({
-          ...g,
-          checkedInAt: g.checkedInAt ? new Date(g.checkedInAt) : null,
-        }));
-
-        setEvents(storedEvents || []);
-        setGuests(parsedGuests || []);
+        // Robustness check: ensure parsed data is a valid object with expected keys
+        if (typeof parsed === 'object' && parsed !== null && 'events' in parsed && 'guests' in parsed) {
+            const { events: storedEvents, guests: storedGuests } = parsed;
+            
+            const parsedGuests = Array.isArray(storedGuests)
+              ? storedGuests.map((g: any) => ({
+                  ...g,
+                  checkedInAt: g.checkedInAt ? new Date(g.checkedInAt) : null,
+                }))
+              : [];
+            
+            setEvents(Array.isArray(storedEvents) ? storedEvents : []);
+            setGuests(parsedGuests);
+        } else {
+            // Malformed data found, clear it to prevent future errors
+            console.warn("Malformed data found in localStorage. Clearing it.");
+            localStorage.removeItem(DATA_STORAGE_KEY);
+        }
       }
     } catch (error) {
-      console.error("Failed to load data from localStorage", error);
+      console.error("Failed to load or parse data from localStorage, clearing potentially corrupt data.", error);
+      localStorage.removeItem(DATA_STORAGE_KEY);
     }
   }, []);
 
