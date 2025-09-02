@@ -26,9 +26,8 @@ const ProtectedRoute: React.FC<{
   requiredRole: string;
   children: React.ReactElement;
 }> = ({ session, requiredRole, children }) => {
-  if (session.isLoading) {
-    return <LoadingSpinner />;
-  }
+  // El componente App ahora maneja el estado de carga global, por lo que este componente
+  // solo se renderiza cuando la sesión ha sido verificada.
   if (!session.user) {
     return <Navigate to="/login" replace />;
   }
@@ -72,6 +71,8 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
+  // Muestra un spinner de carga global mientras se verifica la sesión.
+  // Esto previene que las rutas se rendericen prematuramente y causen bucles de redirección.
   if (session.isLoading) {
     return <LoadingSpinner />;
   }
@@ -123,7 +124,6 @@ const App: React.FC = () => {
                 </ProtectedRoute>
               }
             />
-            <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </div>
       </HashRouter>
