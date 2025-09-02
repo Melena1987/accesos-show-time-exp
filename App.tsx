@@ -1,5 +1,6 @@
 
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { UserRole } from './types';
 import { GuestProvider } from './context/GuestContext';
@@ -8,6 +9,7 @@ import LoginPage from './components/LoginPage';
 import OrganizerDashboard from './components/OrganizerDashboard';
 import ControllerView from './components/ControllerView';
 import AdminDashboard from './components/AdminDashboard';
+import { auth } from './firebase';
 
 interface AuthState {
   role: UserRole;
@@ -17,7 +19,7 @@ interface AuthState {
 const AUTH_STORAGE_KEY = 'showtime-auth-session';
 
 const App: React.FC = () => {
-  const [auth, setAuth] = useState<AuthState>(() => {
+  const [authState, setAuthState] = useState<AuthState>(() => {
     try {
       const storedAuth = localStorage.getItem(AUTH_STORAGE_KEY);
       if (storedAuth) {
@@ -36,7 +38,7 @@ const App: React.FC = () => {
 
   const handleLogin = (role: UserRole, username: string) => {
     const newAuth = { role, username };
-    setAuth(newAuth);
+    setAuthState(newAuth);
     try {
         localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(newAuth));
     } catch (error) {
@@ -45,23 +47,36 @@ const App: React.FC = () => {
   };
   
   const handleLogout = () => {
-    setAuth({ role: UserRole.NONE, username: null });
+    setAuthState({ role: UserRole.NONE, username: null });
     localStorage.removeItem(AUTH_STORAGE_KEY);
   };
+
+  useEffect(() => {
+    // FIX: The `auth` state variable was shadowing the `auth` import from Firebase.
+    // Renamed the state variable to `authState` to resolve the conflict and allow
+    // `onAuthStateChanged` to be called on the correct Firebase auth object.
+    const unsubscribe = auth.onAuthStateChanged(user => {
+      if (!user) {
+        handleLogout();
+      }
+    });
+    
+    return () => unsubscribe();
+  }, []);
 
   return (
     <GuestProvider>
       <HashRouter>
         <div className="min-h-screen bg-gray-900 text-gray-100">
           <Routes>
-            <Route path="/" element={auth.role === UserRole.NONE ? <LandingPage /> : <Navigate to={`/${auth.role}`} />} />
-            <Route path="/login" element={auth.role === UserRole.NONE ? <LoginPage onLogin={handleLogin} /> : <Navigate to={`/${auth.role}`} />} />
+            <Route path="/" element={authState.role === UserRole.NONE ? <LandingPage /> : <Navigate to={`/${authState.role}`} />} />
+            <Route path="/login" element={authState.role === UserRole.NONE ? <LoginPage onLogin={handleLogin} /> : <Navigate to={`/${authState.role}`} />} />
             <Route path="/admin/login" element={<Navigate to="/login" />} />
             <Route
               path="/organizer"
               element={
-                auth.role === UserRole.ORGANIZER && auth.username ? (
-                  <OrganizerDashboard onLogout={handleLogout} loggedInUser={auth.username} />
+                authState.role === UserRole.ORGANIZER && authState.username ? (
+                  <OrganizerDashboard onLogout={handleLogout} loggedInUser={authState.username} />
                 ) : (
                   <Navigate to="/login" />
                 )
@@ -70,7 +85,7 @@ const App: React.FC = () => {
             <Route
               path="/controller"
               element={
-                auth.role === UserRole.CONTROLLER ? (
+                authState.role === UserRole.CONTROLLER ? (
                   <ControllerView onLogout={handleLogout} />
                 ) : (
                   <Navigate to="/login" />
@@ -80,7 +95,7 @@ const App: React.FC = () => {
              <Route
               path="/admin"
               element={
-                auth.role === UserRole.ADMIN ? (
+                authState.role === UserRole.ADMIN ? (
                   <AdminDashboard onLogout={handleLogout} />
                 ) : (
                   <Navigate to="/admin/login" />
