@@ -210,6 +210,7 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
         onError={(error: any) => console.error(error?.message)}
         containerStyle={{ width: '100%', height: '100%', paddingTop: 0 }}
         videoStyle={{ width: '100%', height: '100%', objectFit: 'cover' }}
+        paused={!!result}
       />
       
       <div className="absolute inset-0 bg-black bg-opacity-30 pointer-events-none"></div>
