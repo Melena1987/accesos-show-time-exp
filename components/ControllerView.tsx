@@ -6,6 +6,7 @@ import { CheckInResult, Guest } from '../types';
 import CheckIcon from './icons/CheckIcon';
 import WarningIcon from './icons/WarningIcon';
 import HomeIcon from './icons/HomeIcon';
+import { auth } from '../firebase';
 
 interface ControllerViewProps {
   onLogout: () => void;
@@ -21,6 +22,11 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
   const isProcessing = useRef(false);
 
   const selectedEvent = events.find(e => e.id === selectedEventId);
+  
+  const handleFirebaseLogout = async () => {
+    await auth.signOut();
+    onLogout();
+  };
 
   useEffect(() => {
     if (!isLoading && !initialCheckDone) {
@@ -125,7 +131,7 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
                   <button onClick={() => window.location.reload()} className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md transition-colors">
                       Reintentar
                   </button>
-                  <button onClick={onLogout} className="w-full sm:w-auto bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition-colors">
+                  <button onClick={handleFirebaseLogout} className="w-full sm:w-auto bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition-colors">
                       Menú Principal
                   </button>
                 </div>
@@ -139,7 +145,7 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
         <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-4">
             <header className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center">
                 <h1 className="text-2xl font-bold">Control de Acceso</h1>
-                <button onClick={onLogout} className="flex items-center space-x-2 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition duration-300">
+                <button onClick={handleFirebaseLogout} className="flex items-center space-x-2 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition duration-300">
                     <HomeIcon className="w-5 h-5" />
                     <span>Menú Principal</span>
                 </button>
@@ -244,7 +250,7 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
           <h1 className="text-2xl font-bold">Control de Acceso</h1>
           <p className="text-gray-400 truncate max-w-[calc(100vw-220px)]">Evento: {selectedEvent?.name}</p>
         </div>
-        <button onClick={onLogout} className="flex items-center space-x-2 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition duration-300">
+        <button onClick={handleFirebaseLogout} className="flex items-center space-x-2 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition duration-300">
             <HomeIcon className="w-5 h-5" />
             <span>Menú</span>
         </button>

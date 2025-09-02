@@ -6,6 +6,7 @@ import Invitation from './Invitation';
 import QrCodeIcon from './icons/QrCodeIcon';
 import HomeIcon from './icons/HomeIcon';
 import TrashIcon from './icons/TrashIcon';
+import { auth } from '../firebase';
 
 interface OrganizerDashboardProps {
   onLogout: () => void;
@@ -199,6 +200,11 @@ const OrganizerDashboard: React.FC<OrganizerDashboardProps> = ({ onLogout, logge
 
   const selectedEvent = events.find(e => e.id === selectedEventId);
 
+  const handleFirebaseLogout = async () => {
+    await auth.signOut();
+    onLogout();
+  };
+
   useEffect(() => {
     if (selectedEventId && !selectedEvent && !isLoading) {
       selectEvent(null);
@@ -244,7 +250,7 @@ const OrganizerDashboard: React.FC<OrganizerDashboardProps> = ({ onLogout, logge
                   <h1 className="text-3xl font-bold">Panel del Organizador</h1>
                   <p className="text-gray-400">Bienvenido, {loggedInUser}</p>
                 </div>
-                <button onClick={onLogout} className="flex items-center space-x-2 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition duration-300">
+                <button onClick={handleFirebaseLogout} className="flex items-center space-x-2 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition duration-300">
                     <HomeIcon className="w-5 h-5" />
                     <span>Menú Principal</span>
                 </button>
@@ -279,7 +285,7 @@ const OrganizerDashboard: React.FC<OrganizerDashboardProps> = ({ onLogout, logge
               <h1 className="text-3xl font-bold">Panel del Organizador</h1>
               <p className="text-gray-400">Bienvenido, {loggedInUser}</p>
             </div>
-            <button onClick={onLogout} className="flex items-center space-x-2 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition duration-300">
+            <button onClick={handleFirebaseLogout} className="flex items-center space-x-2 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition duration-300">
                 <HomeIcon className="w-5 h-5" />
                 <span>Menú Principal</span>
             </button>

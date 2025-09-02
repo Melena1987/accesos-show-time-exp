@@ -1,50 +1,40 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { UserRole } from '../types';
+import { auth } from '../firebase';
 
 interface LoginPageProps {
   onLogin: (role: UserRole, username: string) => void;
 }
-
-const validCredentials = [
-  { username: 'Nacho', password: 'NachoAcceso24*' },
-  { username: 'Nachin', password: 'NachinAcceso24*' },
-  { username: 'Vanesa', password: 'VanesaAcceso24*' },
-  { username: 'Mercedes', password: 'MercedesAcceso24*' },
-  { username: 'Arantxa', password: 'ArantxaAcceso24*' },
-  { username: 'Mencia', password: 'MenciaAcceso24*' },
-  { username: 'Manu', password: 'ManuAcceso24*' },
-];
 
 const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
   const [activeTab, setActiveTab] = useState<UserRole>(location.state?.defaultRole || UserRole.ORGANIZER);
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    const loggedInUser = validCredentials.find(
-      cred => cred.username.toLowerCase() === username.toLowerCase() && cred.password === password
-    );
-
-    if (loggedInUser) {
-      onLogin(activeTab, loggedInUser.username);
+    try {
+      const userCredential = await auth.signInWithEmailAndPassword(email, password);
+      const username = userCredential.user?.email?.split('@')[0] || 'Usuario';
+      onLogin(activeTab, username);
       navigate(`/${activeTab}`);
-    } else {
-      setError('Usuario o contraseña inválidos.');
+    } catch (err: any) {
+      setError('Email o contraseña incorrectos.');
+      console.error("Error de autenticación:", err);
     }
   };
 
   const handleTabChange = (role: UserRole) => {
     setActiveTab(role);
     setError('');
-    setUsername('');
+    setEmail('');
     setPassword('');
   };
   
@@ -52,21 +42,21 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
     <form onSubmit={handleLogin} className="space-y-6">
       <div>
         <label
-          htmlFor="username"
+          htmlFor="email"
           className="block text-sm font-medium text-gray-400"
         >
-          Usuario
+          Email
         </label>
         <div className="mt-1">
           <input
-            id="username"
-            name="username"
-            type="text"
-            autoComplete="username"
+            id="email"
+            name="email"
+            type="email"
+            autoComplete="email"
             required
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            placeholder="Introduce tu usuario"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Introduce tu email"
             className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm placeholder-gray-500 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
           />
         </div>

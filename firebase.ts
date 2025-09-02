@@ -2,6 +2,7 @@
 // FIX: Using compat imports for Firebase v9 to support v8 syntax.
 import firebase from "firebase/compat/app";
 import "firebase/compat/firestore";
+import "firebase/compat/auth";
 
 // Your web app's Firebase configuration provided by you
 const firebaseConfig = {
@@ -20,6 +21,7 @@ if (!firebase.apps.length) {
 }
 // FIX: Used v8 `firebase.firestore()` to get the Firestore instance.
 const db = firebase.firestore();
+const auth = firebase.auth();
 
 // Enable offline persistence
 // FIX: Switched to the v8 method `db.enablePersistence()`
@@ -36,4 +38,4 @@ db.enablePersistence()
     }
   });
 
-export { db };
+export { db, auth };

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { UserRole } from '../types';
+import { auth } from '../firebase';
 
 interface AdminLoginPageProps {
   onLogin: (role: UserRole, username: string) => void;
@@ -8,19 +9,27 @@ interface AdminLoginPageProps {
 
 const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onLogin }) => {
   const navigate = useNavigate();
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    if (username.toLowerCase() === 'manu' && password === 'ManuAcceso24*') {
-      onLogin(UserRole.ADMIN, 'Manu');
-      navigate('/admin');
-    } else {
+    try {
+      const userCredential = await auth.signInWithEmailAndPassword(email, password);
+      // Asumimos que el email del admin es específico
+      if (userCredential.user?.email?.toLowerCase() === 'manu@tudominio.com') { // <- Cambia esto por el email real del admin
+          onLogin(UserRole.ADMIN, 'Manu');
+          navigate('/admin');
+      } else {
+          await auth.signOut();
+          setError('Este usuario no tiene permisos de administrador.');
+      }
+    } catch (err: any) {
       setError('Credenciales de administrador inválidas.');
+      console.error("Error de autenticación:", err);
     }
   };
 
@@ -40,21 +49,21 @@ const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onLogin }) => {
           <form onSubmit={handleLogin} className="space-y-6">
             <div>
               <label
-                htmlFor="username"
+                htmlFor="email"
                 className="block text-sm font-medium text-gray-400"
               >
-                Usuario
+                Email
               </label>
               <div className="mt-1">
                 <input
-                  id="username"
-                  name="username"
-                  type="text"
-                  autoComplete="username"
+                  id="email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
                   required
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Usuario de Administrador"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Email de Administrador"
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md shadow-sm placeholder-gray-500 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
                 />
               </div>
