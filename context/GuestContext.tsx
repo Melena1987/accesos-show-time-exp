@@ -11,7 +11,8 @@ import {
   getDocs, 
   writeBatch,
   updateDoc,
-  Timestamp 
+  Timestamp,
+  FirestoreError
 } from 'firebase/firestore';
 import { Guest, AccessLevel, CheckInResult, Event } from '../types';
 
@@ -45,21 +46,33 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const clearError = () => setError(null);
 
+  const handleFirestoreError = (err: FirestoreError) => {
+    console.error("Firestore Error:", err.code, err.message);
+    setIsLoading(false);
+    let detailedError = "No se pudo conectar a la base de datos. La aplicación está en modo sin conexión.";
+    switch (err.code) {
+      case 'permission-denied':
+        detailedError = "Error de Permiso Denegado. Por favor, revisa las Reglas de Seguridad de tu base de datos en el panel de Firebase.";
+        break;
+      case 'unavailable':
+        detailedError = "Servidor no disponible. Revisa tu conexión a internet o las restricciones de la API Key en tu proyecto de Google Cloud.";
+        break;
+      case 'unauthenticated':
+         detailedError = "No autenticado. La configuración de Firebase podría tener problemas.";
+         break;
+    }
+    setError(detailedError);
+  }
+
   useEffect(() => {
     setIsLoading(true);
-    let connectionError = false;
 
     // Listener for events collection in Firestore
     const eventsCollection = collection(db, 'events');
     const unsubscribeEvents = onSnapshot(eventsCollection, (snapshot) => {
-      if (snapshot.metadata.fromCache) {
-        setIsOffline(true);
-        if (connectionError) {
-          setError("Sin conexión. Mostrando datos locales.");
-        }
-      } else {
-        setIsOffline(false);
-        setError(null);
+      setIsOffline(snapshot.metadata.fromCache);
+      if (!snapshot.metadata.fromCache) {
+          setError(null);
       }
       
       const eventsData = snapshot.docs.map(doc => ({
@@ -68,34 +81,23 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       } as Event));
       setEvents(eventsData);
       setIsLoading(false);
-    }, (err) => {
-      console.error("Error fetching events from Firestore:", err);
-      connectionError = true;
-      setError("No se pudo conectar a la base de datos. La aplicación está en modo sin conexión.");
-      setIsLoading(false);
-    });
+    }, handleFirestoreError);
 
     // Listener for guests collection in Firestore
     const guestsCollection = collection(db, 'guests');
     const unsubscribeGuests = onSnapshot(guestsCollection, (snapshot) => {
-      if (snapshot.metadata.fromCache) {
-        setIsOffline(true);
-      } else {
-        setIsOffline(false);
-      }
+      setIsOffline(snapshot.metadata.fromCache);
 
       const guestsData = snapshot.docs.map(doc => {
         const data = doc.data();
         return {
           ...data,
+          id: data.id, // Ensure id is correctly mapped
           checkedInAt: data.checkedInAt ? (data.checkedInAt as Timestamp).toDate() : null,
         } as Guest;
       });
       setGuests(guestsData);
-    }, (err) => {
-      console.error("Error fetching guests from Firestore:", err);
-      setError("No se pudo conectar a la base de datos de invitados.");
-    });
+    }, handleFirestoreError);
 
     // Cleanup listeners on component unmount
     return () => {
@@ -129,8 +131,7 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       const newEventRef = await addDoc(collection(db, 'events'), { name });
       setSelectedEventId(newEventRef.id);
     } catch (err) {
-      console.error("Error adding event to Firestore: ", err);
-      setError("No se pudo crear el evento.");
+      handleFirestoreError(err as FirestoreError);
     }
   };
 
@@ -157,15 +158,15 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         setSelectedEventId(null);
       }
     } catch (err) {
-      console.error("Error deleting event from Firestore: ", err);
-      setError("No se pudo eliminar el evento y sus invitados.");
+      handleFirestoreError(err as FirestoreError);
     }
   };
 
   const addGuest = async (name: string, company: string, accessLevel: AccessLevel, eventId: string, invitedBy: string) => {
     try {
-      const newGuest: Guest = {
-        id: generateShortId(guests.map(g => g.id)),
+      const allGuestIds = guests.map(g => g.id);
+      const newGuest: Omit<Guest, 'checkedInAt'> & { checkedInAt: null } = {
+        id: generateShortId(allGuestIds),
         eventId,
         name,
         company,
@@ -175,8 +176,7 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       };
       await addDoc(collection(db, 'guests'), newGuest);
     } catch (err) {
-      console.error("Error adding guest to Firestore: ", err);
-      setError("No se pudo añadir al invitado.");
+      handleFirestoreError(err as FirestoreError);
     }
   };
 
@@ -192,8 +192,7 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       const guestDocRef = guestsSnapshot.docs[0].ref;
       await deleteDoc(guestDocRef);
     } catch (err) {
-      console.error("Error deleting guest from Firestore: ", err);
-      setError("No se pudo eliminar al invitado.");
+       handleFirestoreError(err as FirestoreError);
     }
   };
   
@@ -212,6 +211,7 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       const guestData = guestDoc.data();
       const guest: Guest = { 
         ...guestData,
+        id: guestData.id,
         checkedInAt: guestData.checkedInAt ? (guestData.checkedInAt as Timestamp).toDate() : null,
       } as Guest;
       
@@ -228,8 +228,7 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       return { status: 'SUCCESS', guest: updatedGuest };
   
     } catch (err) {
-      console.error("Error checking in guest with Firestore:", err);
-      setError("Error al procesar el check-in.");
+      handleFirestoreError(err as FirestoreError);
       return { status: 'NOT_FOUND', guest: null };
     }
   };
