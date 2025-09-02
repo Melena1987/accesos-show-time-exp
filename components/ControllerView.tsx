@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import { useGuests } from '../hooks/useGuests';
 import { CheckInResult, Guest } from '../types';
@@ -17,6 +17,7 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
   const [manualId, setManualId] = useState('');
   const [manualError, setManualError] = useState('');
   const [initialCheckDone, setInitialCheckDone] = useState(false);
+  const isProcessing = useRef(false);
 
   const selectedEvent = events.find(e => e.id === selectedEventId);
 
@@ -32,7 +33,8 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
   }, [isLoading, events, selectEvent, initialCheckDone]);
 
   const handleScan = useCallback(async (decodedText: string) => {
-    if (result) return; // Do not scan if a result is already being shown
+    if (isProcessing.current) return;
+    isProcessing.current = true;
 
     let checkInResult: CheckInResult;
     try {
@@ -56,13 +58,17 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
       checkInResult = { status: 'NOT_FOUND', guest: null };
     }
     setResult(checkInResult);
-  }, [checkInGuest, guests, selectedEventId, events, result]);
+  }, [checkInGuest, guests, selectedEventId, events]);
 
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isProcessing.current) return;
+    isProcessing.current = true;
+
     setManualError('');
     if (!manualId.trim()) {
       setManualError('El ID no puede estar vacío.');
+      isProcessing.current = false;
       return;
     }
     
@@ -85,6 +91,7 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
   
   const handleScanNext = () => {
       setResult(null);
+      isProcessing.current = false;
   };
 
   if (isLoading) {
