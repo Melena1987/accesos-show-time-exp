@@ -29,7 +29,6 @@ const ProtectedRoute: React.FC<{
   if (!session.user) {
     return <Navigate to="/login" replace />;
   }
-  // Se actualiza la redirección en caso de rol no válido para que apunte a la ruta principal `/`.
   if (!session.roles.includes(requiredRole)) {
     return <Navigate to="/" replace />;
   }
@@ -84,15 +83,15 @@ const App: React.FC = () => {
             {/* 
               Ruta de Login: 
               - Si el usuario NO está logueado, muestra la página de login.
-              - Si SÍ está logueado, redirige a /dashboard, que a su vez redirige a / para evitar ver el login de nuevo.
+              - Si SÍ está logueado, redirige a /, que es el dashboard.
             */}
-            <Route path="/login" element={session.user ? <Navigate to="/dashboard" replace /> : <LoginPage />} />
+            <Route path="/login" element={session.user ? <Navigate to="/" replace /> : <LoginPage />} />
 
             {/* 
               Ruta Principal Protegida (/):
               - Si el usuario está logueado, muestra el componente Dashboard.
               - Si NO está logueado, lo redirige a /login.
-              Esta es ahora la ruta canónica para el dashboard.
+              Esta es ahora la única ruta para el dashboard.
             */}
             <Route
               path="/"
@@ -106,8 +105,8 @@ const App: React.FC = () => {
             />
 
             {/* 
-              La ruta /dashboard ahora redirige a / para consolidar la URL del dashboard
-              y mantener la compatibilidad con redirecciones existentes desde el login.
+              La ruta /dashboard ahora redirige a / para mantener la consistencia
+              y evitar URLs duplicadas para el mismo contenido.
             */}
             <Route path="/dashboard" element={<Navigate to="/" replace />} />
 

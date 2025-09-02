@@ -31,7 +31,7 @@ const LoginPage: React.FC = () => {
         const roles: string[] = userData?.roles || [];
         
         if (roles.includes('admin') || roles.includes('organizador') || roles.includes('controlador')) {
-          navigate('/dashboard');
+          navigate('/');
         } else {
           await auth.signOut();
           setError('Usuario no autorizado.');
