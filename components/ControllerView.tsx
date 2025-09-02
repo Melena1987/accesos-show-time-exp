@@ -32,7 +32,7 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
     }
   }, [isLoading, events, selectEvent, initialCheckDone]);
 
-  const handleScan = useCallback(async (decodedText: string) => {
+  const handleScan = async (decodedText: string) => {
     if (isProcessing.current) return;
     isProcessing.current = true;
 
@@ -58,7 +58,7 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
       checkInResult = { status: 'NOT_FOUND', guest: null };
     }
     setResult(checkInResult);
-  }, [checkInGuest, guests, selectedEventId, events]);
+  };
 
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
