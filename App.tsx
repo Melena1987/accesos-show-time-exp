@@ -7,7 +7,6 @@ import LandingPage from './components/LandingPage';
 import LoginPage from './components/LoginPage';
 import OrganizerDashboard from './components/OrganizerDashboard';
 import ControllerView from './components/ControllerView';
-import AdminLoginPage from './components/AdminLoginPage';
 import AdminDashboard from './components/AdminDashboard';
 
 interface AuthState {
@@ -57,7 +56,7 @@ const App: React.FC = () => {
           <Routes>
             <Route path="/" element={auth.role === UserRole.NONE ? <LandingPage /> : <Navigate to={`/${auth.role}`} />} />
             <Route path="/login" element={auth.role === UserRole.NONE ? <LoginPage onLogin={handleLogin} /> : <Navigate to={`/${auth.role}`} />} />
-            <Route path="/admin/login" element={auth.role === UserRole.NONE ? <AdminLoginPage onLogin={handleLogin} /> : <Navigate to="/admin" />} />
+            <Route path="/admin/login" element={<Navigate to="/login" />} />
             <Route
               path="/organizer"
               element={
