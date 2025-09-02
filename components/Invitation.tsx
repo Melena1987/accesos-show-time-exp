@@ -44,7 +44,7 @@ const Invitation: React.ForwardRefRenderFunction<HTMLDivElement, InvitationProps
             size={180}
             bgColor="#ffffff"
             fgColor="#000000"
-            level="H"
+            level="M"
             includeMargin={false}
           />
         </div>

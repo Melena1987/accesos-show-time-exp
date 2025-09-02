@@ -17,7 +17,6 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
   const [manualId, setManualId] = useState('');
   const [manualError, setManualError] = useState('');
   const [initialCheckDone, setInitialCheckDone] = useState(false);
-  const [isScanning, setIsScanning] = useState(true);
 
   const selectedEvent = events.find(e => e.id === selectedEventId);
 
@@ -33,21 +32,7 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
   }, [isLoading, events, selectEvent, initialCheckDone]);
 
   const handleScan = useCallback(async (decodedText: string) => {
-    let proceed = false;
-    
-    // Use functional update to prevent race conditions from multiple quick scans.
-    // This atomically checks and sets the scanning state.
-    setIsScanning(currentlyScanning => {
-      if (currentlyScanning) {
-        proceed = true;
-        return false; // Stop scanning
-      }
-      return false; // Already stopped
-    });
-
-    if (!proceed) {
-      return;
-    }
+    if (result) return; // Do not scan if a result is already being shown
 
     let checkInResult: CheckInResult;
     try {
@@ -71,7 +56,7 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
       checkInResult = { status: 'NOT_FOUND', guest: null };
     }
     setResult(checkInResult);
-  }, [checkInGuest, guests, selectedEventId, events]);
+  }, [checkInGuest, guests, selectedEventId, events, result]);
 
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,8 +66,6 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
       return;
     }
     
-    setIsScanning(false);
-
     let checkInResult: CheckInResult;
     const guest = guests.find(g => g.id === manualId.toUpperCase().trim());
     if (guest && guest.eventId !== selectedEventId) {
@@ -102,7 +85,6 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
   
   const handleScanNext = () => {
       setResult(null);
-      setIsScanning(true);
   };
 
   if (isLoading) {
@@ -170,7 +152,9 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
     );
   }
 
-  if (!isScanning && result) {
+  const renderResultScreen = () => {
+    if (!result) return null;
+
     let bgColor, Icon, title, guestName, guestDetails;
 
     switch (result.status) {
@@ -199,7 +183,7 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
     }
 
     return (
-      <div className={`h-screen w-screen flex flex-col ${bgColor} text-white transition-colors duration-300`}>
+      <div className={`absolute inset-0 flex flex-col ${bgColor} text-white transition-colors duration-300 z-20`}>
         <main className="flex-grow flex flex-col items-center justify-center text-center p-6">
           <Icon className="w-24 h-24 mb-6" />
           <h2 className="text-4xl font-bold mb-2">{title}</h2>
@@ -221,14 +205,12 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
 
   return (
     <div className="relative h-screen w-screen bg-black overflow-hidden">
-      {isScanning && (
-        <Scanner
-          onDecode={handleScan}
-          onError={(error: any) => console.error(error?.message)}
-          containerStyle={{ width: '100%', height: '100%', paddingTop: 0 }}
-          videoStyle={{ width: '100%', height: '100%', objectFit: 'cover' }}
-        />
-      )}
+      <Scanner
+        onDecode={handleScan}
+        onError={(error: any) => console.error(error?.message)}
+        containerStyle={{ width: '100%', height: '100%', paddingTop: 0 }}
+        videoStyle={{ width: '100%', height: '100%', objectFit: 'cover' }}
+      />
       
       <div className="absolute inset-0 bg-black bg-opacity-30 pointer-events-none"></div>
 
@@ -298,6 +280,8 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
           </form>
         )}
       </div>
+
+      {renderResultScreen()}
     </div>
   );
 };
