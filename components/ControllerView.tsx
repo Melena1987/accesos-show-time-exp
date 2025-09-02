@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import { useGuests } from '../hooks/useGuests';
 import { CheckInResult, Guest } from '../types';
@@ -224,9 +224,8 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
       <main className="w-full h-screen flex flex-col items-center justify-center relative">
         <div className="absolute inset-0 overflow-hidden">
           <Scanner
-            // FIX: Changed `onDecode` to `onResult` to match the updated API of the QR scanner library.
-            // The new prop provides a result object, so we extract the text before passing it to the handler.
-            onResult={(result) => handleScan(result.getText())}
+            // FIX: The 'onDecode' prop is not valid for this component. Replaced with 'onScan' which is the correct prop for this library version to handle scan results.
+            onScan={handleScan}
             onError={(error: any) => console.log(error?.message)}
             containerStyle={{ width: '100%', height: '100%', paddingTop: 0 }}
             videoStyle={{ width: '100%', height: '100%', objectFit: 'cover' }}
