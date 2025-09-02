@@ -1,5 +1,7 @@
-import { initializeApp } from "firebase/app";
-import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
+// FIX: Switched to Firebase v8 API compatibility to resolve initialization error.
+// FIX: Using compat imports for Firebase v9 to support v8 syntax.
+import firebase from "firebase/compat/app";
+import "firebase/compat/firestore";
 
 // Your web app's Firebase configuration provided by you
 const firebaseConfig = {
@@ -12,11 +14,16 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+// FIX: Used v8 namespaced `firebase.initializeApp` and added a check to prevent re-initialization.
+if (!firebase.apps.length) {
+  firebase.initializeApp(firebaseConfig);
+}
+// FIX: Used v8 `firebase.firestore()` to get the Firestore instance.
+const db = firebase.firestore();
 
 // Enable offline persistence
-enableIndexedDbPersistence(db)
+// FIX: Switched to the v8 method `db.enablePersistence()`
+db.enablePersistence()
   .catch((err) => {
     if (err.code == 'failed-precondition') {
       // Multiple tabs open, persistence can only be enabled in one.

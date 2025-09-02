@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import { useGuests } from '../hooks/useGuests';
 import { CheckInResult, Guest } from '../types';
@@ -16,8 +16,8 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
   const [showManualInput, setShowManualInput] = useState(false);
   const [manualId, setManualId] = useState('');
   const [manualError, setManualError] = useState('');
-  const resultTimeoutRef = useRef<number | null>(null);
   const [initialCheckDone, setInitialCheckDone] = useState(false);
+  const [isScanning, setIsScanning] = useState(true);
 
   const selectedEvent = events.find(e => e.id === selectedEventId);
 
@@ -32,22 +32,13 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
     }
   }, [isLoading, events, selectEvent, initialCheckDone]);
 
-  const clearResult = useCallback(() => {
-    setResult(null);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (resultTimeoutRef.current) {
-        clearTimeout(resultTimeoutRef.current);
-      }
-    };
-  }, []);
+  const processCheckInResult = (checkInResult: CheckInResult) => {
+      setResult(checkInResult);
+      setIsScanning(false);
+  };
 
   const handleScan = useCallback(async (decodedText: string) => {
-    if (resultTimeoutRef.current) {
-      clearTimeout(resultTimeoutRef.current);
-    }
+    if (!isScanning) return; // Prevent multiple scans while result is shown
 
     let checkInResult: CheckInResult;
     try {
@@ -70,9 +61,8 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
       console.error("Invalid QR code format", e);
       checkInResult = { status: 'NOT_FOUND', guest: null };
     }
-    setResult(checkInResult);
-    resultTimeoutRef.current = window.setTimeout(clearResult, 5000);
-  }, [checkInGuest, clearResult, guests, selectedEventId, events]);
+    processCheckInResult(checkInResult);
+  }, [checkInGuest, guests, selectedEventId, events, isScanning]);
 
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,10 +70,6 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
     if (!manualId.trim()) {
       setManualError('El ID no puede estar vacío.');
       return;
-    }
-
-    if (resultTimeoutRef.current) {
-      clearTimeout(resultTimeoutRef.current);
     }
     
     let checkInResult: CheckInResult;
@@ -98,60 +84,14 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
       checkInResult = await checkInGuest(manualId);
     }
     
-    setResult(checkInResult);
+    processCheckInResult(checkInResult);
     setManualId('');
     setShowManualInput(false);
-    resultTimeoutRef.current = window.setTimeout(clearResult, 5000);
   };
   
-  const renderResult = () => {
-    if (!result) return null;
-
-    let bgColor, Icon, title, guestName, guestDetails;
-
-    switch (result.status) {
-      case 'SUCCESS':
-        bgColor = 'bg-green-500/90';
-        Icon = CheckIcon;
-        title = 'Acceso Permitido';
-        guestName = result.guest?.name;
-        guestDetails = `Nivel ${result.guest?.accessLevel} - ${result.guest?.company}`;
-        break;
-      case 'ALREADY_CHECKED_IN':
-        bgColor = 'bg-yellow-500/90';
-        Icon = WarningIcon;
-        title = 'Invitado Ya Admitido';
-        guestName = result.guest?.name;
-        guestDetails = `Admitido a las ${result.guest?.checkedInAt?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-        break;
-      case 'NOT_FOUND':
-      default:
-        bgColor = 'bg-red-500/90';
-        Icon = WarningIcon;
-        title = 'Acceso Denegado';
-        guestName = result.guest?.name || 'Invitado no encontrado';
-        guestDetails = result.guest?.company || 'Verifica el código o ID.';
-        break;
-    }
-
-    return (
-      <div 
-        className={`fixed inset-x-4 bottom-24 z-20 flex justify-center transition-transform duration-300 ${result ? 'scale-100' : 'scale-95'}`}
-        onClick={clearResult}
-        aria-live="polite"
-      >
-        <div className={`${bgColor} text-white rounded-xl shadow-2xl p-6 w-full max-w-sm flex items-start space-x-4`}>
-          <div className="flex-shrink-0 pt-1">
-            <Icon className="w-8 h-8" />
-          </div>
-          <div>
-            <h3 className="text-xl font-bold">{title}</h3>
-            {guestName && <p className="text-lg mt-1">{guestName}</p>}
-            {guestDetails && <p className="text-sm opacity-80">{guestDetails}</p>}
-          </div>
-        </div>
-      </div>
-    );
+  const handleScanNext = () => {
+      setResult(null);
+      setIsScanning(true);
   };
 
   if (isLoading) {
@@ -219,9 +159,58 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
     );
   }
 
+  if (!isScanning && result) {
+    let bgColor, Icon, title, guestName, guestDetails;
+
+    switch (result.status) {
+      case 'SUCCESS':
+        bgColor = 'bg-green-600';
+        Icon = CheckIcon;
+        title = 'Acceso Permitido';
+        guestName = result.guest?.name;
+        guestDetails = `Nivel ${result.guest?.accessLevel} - ${result.guest?.company}`;
+        break;
+      case 'ALREADY_CHECKED_IN':
+        bgColor = 'bg-yellow-600';
+        Icon = WarningIcon;
+        title = 'Invitado Ya Admitido';
+        guestName = result.guest?.name;
+        guestDetails = `Admitido a las ${result.guest?.checkedInAt?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+        break;
+      case 'NOT_FOUND':
+      default:
+        bgColor = 'bg-red-600';
+        Icon = WarningIcon;
+        title = 'Acceso Denegado';
+        guestName = result.guest?.name || 'Invitado no encontrado';
+        guestDetails = result.guest?.company || 'Verifica el código o ID.';
+        break;
+    }
+
+    return (
+      <div className={`h-screen w-screen flex flex-col ${bgColor} text-white transition-colors duration-300`}>
+        <main className="flex-grow flex flex-col items-center justify-center text-center p-6">
+          <Icon className="w-24 h-24 mb-6" />
+          <h2 className="text-4xl font-bold mb-2">{title}</h2>
+          {guestName && <p className="text-2xl mt-1">{guestName}</p>}
+          {guestDetails && <p className="text-lg opacity-80 mt-1">{guestDetails}</p>}
+        </main>
+        <footer className="w-full p-4">
+          <button
+            onClick={handleScanNext}
+            className="w-full bg-white text-gray-900 font-bold py-4 px-4 rounded-xl text-lg transition duration-300 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-4 focus:ring-offset-current focus:ring-white"
+            aria-label="Escanear siguiente invitado"
+          >
+            Escanear Siguiente
+          </button>
+        </footer>
+      </div>
+    );
+  }
+
   return (
     <div className="relative h-screen w-screen bg-black overflow-hidden">
-      {/* This component uses a specific library version, so `onDecode` is the correct prop. */}
+      {/* FIX: The `onResult` prop does not exist on the `Scanner` component. Changed to `onDecode` which is the correct prop for handling scan results as a string. */}
       <Scanner
         onDecode={handleScan}
         onError={(error: any) => console.error(error?.message)}
@@ -248,14 +237,10 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
         </div>
       )}
 
-      {renderResult()}
-
-      {!result && (
-        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 z-0 flex justify-center pointer-events-none">
+      <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 z-0 flex justify-center pointer-events-none">
           <div className="w-64 h-64 border-4 border-white/50 rounded-2xl animate-pulse"></div>
-        </div>
-      )}
-
+      </div>
+      
       <div className="absolute inset-x-4 bottom-4 z-10">
         {!showManualInput ? (
           <button

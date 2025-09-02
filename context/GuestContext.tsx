@@ -1,19 +1,9 @@
 import React, { createContext, useState, useEffect, ReactNode } from 'react';
+// FIX: Switched to Firebase v8 compatible imports to align with firebase.ts initialization.
+// FIX: Using compat imports for Firebase v9 to support v8 syntax.
+import firebase from 'firebase/compat/app';
+import 'firebase/compat/firestore';
 import { db } from '../firebase';
-import { 
-  collection, 
-  onSnapshot, 
-  addDoc, 
-  deleteDoc, 
-  doc, 
-  query, 
-  where, 
-  getDocs, 
-  writeBatch,
-  updateDoc,
-  Timestamp,
-  FirestoreError
-} from 'firebase/firestore';
 import { Guest, AccessLevel, CheckInResult, Event } from '../types';
 
 interface GuestContextType {
@@ -46,7 +36,8 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const clearError = () => setError(null);
 
-  const handleFirestoreError = (err: FirestoreError) => {
+  // FIX: Updated error handler to use a generic type for the error object, as FirestoreError type is not directly available in v8 in the same way.
+  const handleFirestoreError = (err: any) => {
     console.error("Firestore Error:", err.code, err.message);
     setIsLoading(false);
     let detailedError = "No se pudo conectar a la base de datos. La aplicación está en modo sin conexión.";
@@ -67,9 +58,9 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   useEffect(() => {
     setIsLoading(true);
 
-    // Listener for events collection in Firestore
-    const eventsCollection = collection(db, 'events');
-    const unsubscribeEvents = onSnapshot(eventsCollection, (snapshot) => {
+    // FIX: Switched to Firebase v8 API for accessing collections and listening for snapshots.
+    const eventsCollection = db.collection('events');
+    const unsubscribeEvents = eventsCollection.onSnapshot((snapshot) => {
       setIsOffline(snapshot.metadata.fromCache);
       if (!snapshot.metadata.fromCache) {
           setError(null);
@@ -83,9 +74,9 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       setIsLoading(false);
     }, handleFirestoreError);
 
-    // Listener for guests collection in Firestore
-    const guestsCollection = collection(db, 'guests');
-    const unsubscribeGuests = onSnapshot(guestsCollection, (snapshot) => {
+    // FIX: Switched to Firebase v8 API for accessing collections and listening for snapshots.
+    const guestsCollection = db.collection('guests');
+    const unsubscribeGuests = guestsCollection.onSnapshot((snapshot) => {
       setIsOffline(snapshot.metadata.fromCache);
 
       const guestsData = snapshot.docs.map(doc => {
@@ -93,7 +84,8 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         return {
           ...data,
           id: data.id, // Ensure id is correctly mapped
-          checkedInAt: data.checkedInAt ? (data.checkedInAt as Timestamp).toDate() : null,
+          // FIX: Used firebase.firestore.Timestamp for type casting in v8.
+          checkedInAt: data.checkedInAt ? (data.checkedInAt as firebase.firestore.Timestamp).toDate() : null,
         } as Guest;
       });
       setGuests(guestsData);
@@ -128,10 +120,11 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const addEvent = async (name: string) => {
     try {
-      const newEventRef = await addDoc(collection(db, 'events'), { name });
+      // FIX: Switched to Firebase v8 API for adding a document.
+      const newEventRef = await db.collection('events').add({ name });
       setSelectedEventId(newEventRef.id);
     } catch (err) {
-      handleFirestoreError(err as FirestoreError);
+      handleFirestoreError(err as any);
     }
   };
 
@@ -141,15 +134,18 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const deleteEvent = async (eventId: string) => {
     try {
-      const batch = writeBatch(db);
+      // FIX: Switched to Firebase v8 API for creating a batch write.
+      const batch = db.batch();
 
-      const guestsQuery = query(collection(db, 'guests'), where('eventId', '==', eventId));
-      const guestsSnapshot = await getDocs(guestsQuery);
+      // FIX: Switched to Firebase v8 API for querying documents.
+      const guestsQuery = db.collection('guests').where('eventId', '==', eventId);
+      const guestsSnapshot = await guestsQuery.get();
       guestsSnapshot.forEach(doc => {
         batch.delete(doc.ref);
       });
       
-      const eventRef = doc(db, 'events', eventId);
+      // FIX: Switched to Firebase v8 API for getting a document reference.
+      const eventRef = db.collection('events').doc(eventId);
       batch.delete(eventRef);
 
       await batch.commit();
@@ -158,7 +154,7 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         setSelectedEventId(null);
       }
     } catch (err) {
-      handleFirestoreError(err as FirestoreError);
+      handleFirestoreError(err as any);
     }
   };
 
@@ -174,25 +170,28 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
         checkedInAt: null,
         invitedBy,
       };
-      await addDoc(collection(db, 'guests'), newGuest);
+      // FIX: Switched to Firebase v8 API for adding a document.
+      await db.collection('guests').add(newGuest);
     } catch (err) {
-      handleFirestoreError(err as FirestoreError);
+      handleFirestoreError(err as any);
     }
   };
 
   const deleteGuest = async (guestId: string) => {
     try {
-      const guestsQuery = query(collection(db, 'guests'), where('id', '==', guestId));
-      const guestsSnapshot = await getDocs(guestsQuery);
+      // FIX: Switched to Firebase v8 API for querying documents.
+      const guestsQuery = db.collection('guests').where('id', '==', guestId);
+      const guestsSnapshot = await guestsQuery.get();
 
       if (guestsSnapshot.empty) {
         throw new Error("Guest not found for deletion");
       }
 
       const guestDocRef = guestsSnapshot.docs[0].ref;
-      await deleteDoc(guestDocRef);
+      // FIX: Switched to Firebase v8 API for deleting a document.
+      await guestDocRef.delete();
     } catch (err) {
-       handleFirestoreError(err as FirestoreError);
+       handleFirestoreError(err as any);
     }
   };
   
@@ -200,8 +199,9 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const normalizedGuestId = guestId.toUpperCase().trim();
     
     try {
-      const guestsQuery = query(collection(db, 'guests'), where('id', '==', normalizedGuestId));
-      const guestsSnapshot = await getDocs(guestsQuery);
+      // FIX: Switched to Firebase v8 API for querying documents.
+      const guestsQuery = db.collection('guests').where('id', '==', normalizedGuestId);
+      const guestsSnapshot = await guestsQuery.get();
   
       if (guestsSnapshot.empty) {
         return { status: 'NOT_FOUND', guest: null };
@@ -212,7 +212,8 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       const guest: Guest = { 
         ...guestData,
         id: guestData.id,
-        checkedInAt: guestData.checkedInAt ? (guestData.checkedInAt as Timestamp).toDate() : null,
+        // FIX: Used firebase.firestore.Timestamp for type casting in v8.
+        checkedInAt: guestData.checkedInAt ? (guestData.checkedInAt as firebase.firestore.Timestamp).toDate() : null,
       } as Guest;
       
       if (guest.checkedInAt) {
@@ -221,14 +222,15 @@ export const GuestProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       
       const guestDocRef = guestDoc.ref;
       const checkInTime = new Date();
-      await updateDoc(guestDocRef, { checkedInAt: Timestamp.fromDate(checkInTime) });
+      // FIX: Switched to Firebase v8 API for updating a document and creating a timestamp.
+      await guestDocRef.update({ checkedInAt: firebase.firestore.Timestamp.fromDate(checkInTime) });
       
       const updatedGuest = { ...guest, checkedInAt: checkInTime };
   
       return { status: 'SUCCESS', guest: updatedGuest };
   
     } catch (err) {
-      handleFirestoreError(err as FirestoreError);
+      handleFirestoreError(err as any);
       return { status: 'NOT_FOUND', guest: null };
     }
   };
