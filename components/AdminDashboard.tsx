@@ -5,17 +5,8 @@ import DownloadIcon from './icons/DownloadIcon';
 import TrashIcon from './icons/TrashIcon';
 import { auth } from '../firebase';
 
-interface AdminDashboardProps {
-  onLogout: () => void;
-}
-
-const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
+const AdminDashboard: React.FC = () => {
   const { events, guests, isLoading, isOffline, error, clearError, deleteEvent } = useGuests();
-
-  const handleFirebaseLogout = async () => {
-    await auth.signOut();
-    onLogout();
-  };
 
   const handleExportToCSV = (event: Event, eventGuests: Guest[]) => {
     const headers = ["ID Invitado", "Nombre", "Empresa", "Nivel Acceso", "Invitado Por", "Hora Admisión"];
@@ -51,7 +42,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
             <header className="flex justify-between items-center mb-8">
                 <h1 className="text-3xl font-bold">Panel de Administración</h1>
                  <button 
-                  onClick={handleFirebaseLogout} 
+                  onClick={() => auth.signOut()}
                   className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md transition duration-300"
                 >
                   Cerrar Sesión
@@ -83,7 +74,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
       <header className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold">Panel de Administración</h1>
         <button 
-          onClick={handleFirebaseLogout} 
+          onClick={() => auth.signOut()}
           className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md transition duration-300"
         >
           Cerrar Sesión

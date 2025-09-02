@@ -1,14 +1,8 @@
-
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { UserRole } from '../types';
+import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../firebase';
 
-interface LoginPageProps {
-  onLogin: (role: UserRole, username: string) => void;
-}
-
-const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
+const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -32,25 +26,9 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
       if (userDoc.exists) {
         const userData = userDoc.data();
         const roles: string[] = userData?.roles || [];
-        const username = user.email?.split('@')[0] || 'Usuario';
         
-        let targetRole: UserRole | null = null;
-        let targetPath: string | null = null;
-
-        if (roles.includes('admin')) {
-          targetRole = UserRole.ADMIN;
-          targetPath = '/admin';
-        } else if (roles.includes('organizer')) {
-          targetRole = UserRole.ORGANIZER;
-          targetPath = '/organizer';
-        } else if (roles.includes('controller')) {
-          targetRole = UserRole.CONTROLLER;
-          targetPath = '/controller';
-        }
-        
-        if (targetRole && targetPath) {
-          onLogin(targetRole, username);
-          navigate(targetPath);
+        if (roles.includes('admin') || roles.includes('organizer') || roles.includes('controller')) {
+          navigate('/dashboard');
         } else {
           await auth.signOut();
           setError('Usuario no autorizado.');
@@ -138,11 +116,6 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                 </button>
               </div>
             </form>
-        </div>
-        <div className="text-center">
-          <Link to="/" className="font-medium text-indigo-400 hover:text-indigo-300 transition-colors">
-            ← Volver a la página principal
-          </Link>
         </div>
       </div>
     </div>

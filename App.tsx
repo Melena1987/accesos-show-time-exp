@@ -1,105 +1,126 @@
-
-
 import React, { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { UserRole } from './types';
+import firebase from 'firebase/compat/app';
 import { GuestProvider } from './context/GuestContext';
-import LandingPage from './components/LandingPage';
 import LoginPage from './components/LoginPage';
 import OrganizerDashboard from './components/OrganizerDashboard';
 import ControllerView from './components/ControllerView';
 import AdminDashboard from './components/AdminDashboard';
-import { auth } from './firebase';
+import Dashboard from './components/Dashboard';
+import { auth, db } from './firebase';
 
-interface AuthState {
-  role: UserRole;
-  username: string | null;
+interface SessionState {
+  user: firebase.User | null;
+  roles: string[];
+  isLoading: boolean;
 }
 
-const AUTH_STORAGE_KEY = 'showtime-auth-session';
+const LoadingSpinner: React.FC = () => (
+  <div className="min-h-screen flex items-center justify-center bg-gray-900">
+    <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-indigo-500"></div>
+  </div>
+);
+
+const ProtectedRoute: React.FC<{
+  session: SessionState;
+  requiredRole: string;
+  children: React.ReactElement;
+}> = ({ session, requiredRole, children }) => {
+  if (session.isLoading) {
+    return <LoadingSpinner />;
+  }
+  if (!session.user) {
+    return <Navigate to="/login" replace />;
+  }
+  if (!session.roles.includes(requiredRole)) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  return children;
+};
 
 const App: React.FC = () => {
-  const [authState, setAuthState] = useState<AuthState>(() => {
-    try {
-      const storedAuth = localStorage.getItem(AUTH_STORAGE_KEY);
-      if (storedAuth) {
-        const parsedAuth = JSON.parse(storedAuth);
-        // Basic validation
-        if (Object.values(UserRole).includes(parsedAuth.role) && parsedAuth.username) {
-            return parsedAuth;
-        }
-      }
-    } catch (error) {
-      console.error("Failed to parse auth from localStorage", error);
-      localStorage.removeItem(AUTH_STORAGE_KEY);
-    }
-    return { role: UserRole.NONE, username: null };
+  const [session, setSession] = useState<SessionState>({
+    user: null,
+    roles: [],
+    isLoading: true,
   });
 
-  const handleLogin = (role: UserRole, username: string) => {
-    const newAuth = { role, username };
-    setAuthState(newAuth);
-    try {
-        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(newAuth));
-    } catch (error) {
-        console.error("Failed to save auth to localStorage", error);
-    }
-  };
-  
-  const handleLogout = () => {
-    setAuthState({ role: UserRole.NONE, username: null });
-    localStorage.removeItem(AUTH_STORAGE_KEY);
-  };
-
   useEffect(() => {
-    // FIX: The `auth` state variable was shadowing the `auth` import from Firebase.
-    // Renamed the state variable to `authState` to resolve the conflict and allow
-    // `onAuthStateChanged` to be called on the correct Firebase auth object.
-    const unsubscribe = auth.onAuthStateChanged(user => {
-      if (!user) {
-        handleLogout();
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
+      if (user) {
+        try {
+          const userDocRef = db.collection('users').doc(user.uid);
+          const userDoc = await userDocRef.get();
+          if (userDoc.exists) {
+            const userData = userDoc.data();
+            const roles: string[] = userData?.roles || [];
+            setSession({ user, roles, isLoading: false });
+          } else {
+            console.warn(`User authenticated but has no roles document: ${user.uid}`);
+            await auth.signOut();
+            setSession({ user: null, roles: [], isLoading: false });
+          }
+        } catch (error) {
+          console.error("Error fetching user roles:", error);
+          await auth.signOut();
+          setSession({ user: null, roles: [], isLoading: false });
+        }
+      } else {
+        setSession({ user: null, roles: [], isLoading: false });
       }
     });
-    
     return () => unsubscribe();
   }, []);
 
+  if (session.isLoading) {
+    return <LoadingSpinner />;
+  }
+
+  const username = session.user?.email?.split('@')[0] || 'Usuario';
+  
   return (
     <GuestProvider>
       <HashRouter>
         <div className="min-h-screen bg-gray-900 text-gray-100">
           <Routes>
-            <Route path="/" element={authState.role === UserRole.NONE ? <LandingPage /> : <Navigate to={`/${authState.role}`} />} />
-            <Route path="/login" element={authState.role === UserRole.NONE ? <LoginPage onLogin={handleLogin} /> : <Navigate to={`/${authState.role}`} />} />
+            <Route path="/login" element={session.user ? <Navigate to="/dashboard" /> : <LoginPage />} />
             <Route path="/admin/login" element={<Navigate to="/login" />} />
+            
+            <Route path="/" element={session.user ? <Navigate to="/dashboard" /> : <LoginPage />} />
+            
             <Route
-              path="/organizer"
+              path="/dashboard"
               element={
-                authState.role === UserRole.ORGANIZER && authState.username ? (
-                  <OrganizerDashboard onLogout={handleLogout} loggedInUser={authState.username} />
+                session.user ? (
+                  <Dashboard username={username} roles={session.roles} />
                 ) : (
                   <Navigate to="/login" />
                 )
+              }
+            />
+
+            <Route
+              path="/organizer"
+              element={
+                <ProtectedRoute session={session} requiredRole="organizer">
+                  <OrganizerDashboard loggedInUser={username} />
+                </ProtectedRoute>
               }
             />
             <Route
               path="/controller"
               element={
-                authState.role === UserRole.CONTROLLER ? (
-                  <ControllerView onLogout={handleLogout} />
-                ) : (
-                  <Navigate to="/login" />
-                )
+                <ProtectedRoute session={session} requiredRole="controller">
+                  <ControllerView />
+                </ProtectedRoute>
               }
             />
              <Route
               path="/admin"
               element={
-                authState.role === UserRole.ADMIN ? (
-                  <AdminDashboard onLogout={handleLogout} />
-                ) : (
-                  <Navigate to="/admin/login" />
-                )
+                <ProtectedRoute session={session} requiredRole="admin">
+                  <AdminDashboard />
+                </ProtectedRoute>
               }
             />
             <Route path="*" element={<Navigate to="/" />} />
