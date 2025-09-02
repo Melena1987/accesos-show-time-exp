@@ -213,7 +213,7 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
   return (
     <div className="relative h-screen w-screen bg-black overflow-hidden">
       <Scanner
-        onDecode={handleScan}
+        onResult={handleScan}
         onError={(error: any) => console.error(error?.message)}
         containerStyle={{ width: '100%', height: '100%', paddingTop: 0 }}
         videoStyle={{ width: '100%', height: '100%', objectFit: 'cover' }}
