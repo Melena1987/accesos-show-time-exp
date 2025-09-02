@@ -177,20 +177,29 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
 
     let bgColor, Icon, title, guestName, guestDetails;
 
+    const accessLevelStyles: { [key: number]: { bg: string, text: string } } = {
+      1: { bg: 'bg-yellow-500', text: 'text-gray-900' },
+      2: { bg: 'bg-sky-500', text: 'text-white' },
+      3: { bg: 'bg-orange-500', text: 'text-white' }
+    };
+    
+    const accessLevel = result.guest?.accessLevel;
+    const currentStyle = accessLevel ? accessLevelStyles[accessLevel] : null;
+
     switch (result.status) {
       case 'SUCCESS':
         bgColor = 'bg-green-600';
         Icon = CheckIcon;
         title = 'Acceso Permitido';
         guestName = result.guest?.name;
-        guestDetails = `Nivel ${result.guest?.accessLevel} - ${result.guest?.company}`;
+        guestDetails = result.guest?.company;
         break;
       case 'ALREADY_CHECKED_IN':
         bgColor = 'bg-yellow-600';
         Icon = WarningIcon;
         title = 'Invitado Ya Admitido';
         guestName = result.guest?.name;
-        guestDetails = `Admitido a las ${result.guest?.checkedInAt?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+        guestDetails = `${result.guest?.company} - Admitido a las ${result.guest?.checkedInAt?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
         break;
       case 'NOT_FOUND':
         bgColor = 'bg-red-600';
@@ -210,6 +219,13 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
         </div>
         <h2 className="text-4xl font-bold mb-2">{title}</h2>
         <p className="text-3xl font-semibold">{guestName}</p>
+        
+        {result.guest && (result.status === 'SUCCESS' || result.status === 'ALREADY_CHECKED_IN') && currentStyle && (
+            <div className={`my-4 px-4 py-1 inline-block text-lg font-semibold rounded-full ${currentStyle.bg} ${currentStyle.text}`}>
+                NIVEL DE ACCESO {accessLevel}
+            </div>
+        )}
+
         <p className="text-xl opacity-80">{guestDetails}</p>
         <button
           onClick={handleScanNext}
@@ -240,8 +256,11 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
             // FIX: The 'onDecode' prop is not valid for this component. Replaced with 'onScan' which is the correct prop for this library version to handle scan results.
             onScan={handleScan}
             onError={(error: any) => console.log(error?.message)}
-            containerStyle={{ width: '100%', height: '100%', paddingTop: 0 }}
-            videoStyle={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            // FIX: Replaced deprecated props `containerStyle` and `videoStyle` with the `styles` prop to align with the updated QR scanner library API.
+            styles={{
+              container: { width: '100%', height: '100%', paddingTop: 0 },
+              video: { width: '100%', height: '100%', objectFit: 'cover' },
+            }}
             paused={!!result}
           />
         </div>
