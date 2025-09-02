@@ -102,7 +102,7 @@ const App: React.FC = () => {
             <Route
               path="/organizer"
               element={
-                <ProtectedRoute session={session} requiredRole="organizer">
+                <ProtectedRoute session={session} requiredRole="organizador">
                   <OrganizerDashboard loggedInUser={username} />
                 </ProtectedRoute>
               }
@@ -110,7 +110,7 @@ const App: React.FC = () => {
             <Route
               path="/controller"
               element={
-                <ProtectedRoute session={session} requiredRole="controller">
+                <ProtectedRoute session={session} requiredRole="controlador">
                   <ControllerView />
                 </ProtectedRoute>
               }

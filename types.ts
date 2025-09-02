@@ -5,8 +5,8 @@ export interface Event {
 }
 
 export enum UserRole {
-  ORGANIZER = 'organizer',
-  CONTROLLER = 'controller',
+  ORGANIZER = 'organizador',
+  CONTROLLER = 'controlador',
   ADMIN = 'admin',
   NONE = 'none',
 }

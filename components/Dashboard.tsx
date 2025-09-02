@@ -26,7 +26,7 @@ const Dashboard: React.FC<DashboardProps> = ({ username, roles }) => {
       color: 'text-red-400',
       hover: 'hover:border-red-500 hover:shadow-red-500/10'
     },
-    organizer: {
+    organizador: {
       path: '/organizer',
       title: 'Panel de Organizador',
       description: 'Crea eventos y gestiona invitados.',
@@ -34,7 +34,7 @@ const Dashboard: React.FC<DashboardProps> = ({ username, roles }) => {
       color: 'text-indigo-400',
       hover: 'hover:border-indigo-500 hover:shadow-indigo-500/10'
     },
-    controller: {
+    controlador: {
       path: '/controller',
       title: 'Vista de Controlador',
       description: 'Escanea códigos QR para validar el acceso.',
@@ -44,7 +44,7 @@ const Dashboard: React.FC<DashboardProps> = ({ username, roles }) => {
     }
   };
 
-  const availableRoles = ['admin', 'organizer', 'controller'].filter(role => roles.includes(role));
+  const availableRoles = ['admin', 'organizador', 'controlador'].filter(role => roles.includes(role));
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900 text-white p-4">
