@@ -3,12 +3,12 @@ import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
 
 // Your web app's Firebase configuration provided by you
 const firebaseConfig = {
-    apiKey: "AIzaSyCOuRcd0ijQ4JVMZaWDWwOXVTZxYOsBRVI",
-    authDomain: "accesos-show-time-8528a.firebaseapp.com",
-    projectId: "accesos-show-time-8528a",
-    storageBucket: "accesos-show-time-8528a.firebasestorage.app",
-    messagingSenderId: "14955721313",
-    appId: "1:14955721313:web:79c3d4a6c15f77e2fbf020"
+  apiKey: "AIzaSyCOuRcd0ijQ4JVMZaWDWwOXVTZxYOsBRVI",
+  authDomain: "accesos-show-time-8528a.firebaseapp.com",
+  projectId: "accesos-show-time-8528a",
+  storageBucket: "accesos-show-time-8528a.firebasestorage.app",
+  messagingSenderId: "14955721313",
+  appId: "1:14955721313:web:79c3d4a6c15f77e2fbf020"
 };
 
 // Initialize Firebase
