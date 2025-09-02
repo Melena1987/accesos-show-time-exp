@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Scanner } from '@yudiel/react-qr-scanner';
+// FIX: Import IDetectedBarcode to match the type expected by the onScan prop.
+import { Scanner, IDetectedBarcode } from '@yudiel/react-qr-scanner';
 import { useGuests } from '../hooks/useGuests';
 import { CheckInResult, Guest } from '../types';
 import CheckIcon from './icons/CheckIcon';
@@ -32,31 +33,43 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
     }
   }, [isLoading, events, selectEvent, initialCheckDone]);
 
-  const handleScan = async (decodedText: string) => {
-    if (isProcessing.current) return;
+  // FIX: Update handleScan to accept an array of detected codes to match the onScan prop signature.
+  const handleScan = async (detectedCodes: IDetectedBarcode[]) => {
+    if (isProcessing.current || detectedCodes.length === 0) return;
     isProcessing.current = true;
 
-    let checkInResult: CheckInResult;
+    const decodedText = detectedCodes[0].rawValue;
+
+    let guestId: string | null = null;
     try {
+      // Intenta parsear como JSON para extraer el ID.
       const qrData = JSON.parse(decodedText);
-      if (qrData.id) {
-        const guest = guests.find(g => g.id === qrData.id.toUpperCase().trim());
-        if (guest && guest.eventId !== selectedEventId) {
-           const guestEvent = events.find(e => e.id === guest.eventId);
-           checkInResult = {
-               status: 'NOT_FOUND',
-               guest: { ...guest, company: `Evento: ${guestEvent?.name || 'Otro'}` } as Guest
-           };
-        } else {
-          checkInResult = await checkInGuest(qrData.id);
-        }
-      } else {
-        checkInResult = { status: 'NOT_FOUND', guest: null };
+      if (qrData && qrData.id) {
+        guestId = qrData.id;
       }
     } catch (e) {
-      console.error("Invalid QR code format", e);
+      // Si falla, asume que el texto decodificado es el propio ID.
+      guestId = decodedText;
+    }
+    
+    let checkInResult: CheckInResult;
+
+    if (guestId && typeof guestId === 'string' && guestId.trim()) {
+      const guest = guests.find(g => g.id === guestId.toUpperCase().trim());
+      if (guest && guest.eventId !== selectedEventId) {
+         const guestEvent = events.find(e => e.id === guest.eventId);
+         checkInResult = {
+             status: 'NOT_FOUND',
+             guest: { ...guest, company: `Evento: ${guestEvent?.name || 'Otro'}` } as Guest
+         };
+      } else {
+        checkInResult = await checkInGuest(guestId);
+      }
+    } else {
+      console.error("Invalid QR code format", decodedText);
       checkInResult = { status: 'NOT_FOUND', guest: null };
     }
+
     setResult(checkInResult);
   };
 
