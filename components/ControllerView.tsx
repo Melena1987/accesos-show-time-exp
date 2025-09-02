@@ -180,114 +180,116 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
         guestDetails = `Admitido a las ${result.guest?.checkedInAt?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
         break;
       case 'NOT_FOUND':
-      default:
         bgColor = 'bg-red-600';
         Icon = WarningIcon;
         title = 'Acceso Denegado';
         guestName = result.guest?.name || 'Invitado no encontrado';
-        guestDetails = result.guest?.company || 'Verifica el código o ID.';
+        guestDetails = result.guest?.company || 'Este código no es válido para este evento.';
         break;
+      default:
+        return null;
     }
 
     return (
-      <div className={`absolute inset-0 flex flex-col ${bgColor} text-white transition-colors duration-300 z-20`}>
-        <main className="flex-grow flex flex-col items-center justify-center text-center p-6">
-          <Icon className="w-24 h-24 mb-6" />
-          <h2 className="text-4xl font-bold mb-2">{title}</h2>
-          {guestName && <p className="text-2xl mt-1">{guestName}</p>}
-          {guestDetails && <p className="text-lg opacity-80 mt-1">{guestDetails}</p>}
-        </main>
-        <footer className="w-full p-4">
-          <button
-            onClick={handleScanNext}
-            className="w-full bg-white text-gray-900 font-bold py-4 px-4 rounded-xl text-lg transition duration-300 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-4 focus:ring-offset-current focus:ring-white"
-            aria-label="Escanear siguiente invitado"
-          >
-            Escanear Siguiente
-          </button>
-        </footer>
+      <div className={`fixed inset-0 z-50 flex flex-col items-center justify-center p-4 text-white text-center ${bgColor}`}>
+        <div className="w-32 h-32 mb-6">
+          <Icon className="w-full h-full" />
+        </div>
+        <h2 className="text-4xl font-bold mb-2">{title}</h2>
+        <p className="text-3xl font-semibold">{guestName}</p>
+        <p className="text-xl opacity-80">{guestDetails}</p>
+        <button
+          onClick={handleScanNext}
+          className="mt-12 bg-white/20 hover:bg-white/30 text-white font-bold py-3 px-8 rounded-lg text-lg transition-colors"
+        >
+          Escanear Siguiente
+        </button>
       </div>
     );
-  }
-
+  };
+  
   return (
-    <div className="relative h-screen w-screen bg-black overflow-hidden">
-      <Scanner
-        onResult={handleScan}
-        onError={(error: any) => console.error(error?.message)}
-        containerStyle={{ width: '100%', height: '100%', paddingTop: 0 }}
-        videoStyle={{ width: '100%', height: '100%', objectFit: 'cover' }}
-        paused={!!result}
-      />
-      
-      <div className="absolute inset-0 bg-black bg-opacity-30 pointer-events-none"></div>
-
-      <header className="absolute top-0 left-0 right-0 z-10 p-4 flex justify-between items-center bg-gradient-to-b from-black/60 to-transparent">
+    <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center">
+      <header className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center bg-black/50 z-10">
         <div>
-            <h1 className="text-2xl font-bold text-white shadow-md">Control de Acceso</h1>
-            <p className="text-indigo-300 font-semibold shadow-md truncate max-w-xs">{selectedEvent?.name}</p>
+          <h1 className="text-2xl font-bold">Control de Acceso</h1>
+          <p className="text-gray-400 truncate max-w-[calc(100vw-220px)]">Evento: {selectedEvent?.name}</p>
         </div>
-        <button onClick={onLogout} className="flex items-center space-x-2 bg-gray-700/80 hover:bg-gray-600/80 text-white font-bold py-2 px-4 rounded-md transition duration-300 backdrop-blur-sm flex-shrink-0">
-          <HomeIcon className="w-5 h-5" />
-          <span>Menú Principal</span>
+        <button onClick={onLogout} className="flex items-center space-x-2 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition duration-300">
+            <HomeIcon className="w-5 h-5" />
+            <span>Menú</span>
         </button>
       </header>
 
-      {isOffline && (
-        <div className="absolute top-24 left-1/2 -translate-x-1/2 z-10 bg-yellow-600/90 text-white text-sm font-semibold py-2 px-4 rounded-lg backdrop-blur-sm shadow-lg">
-            Modo sin conexión
+      <main className="w-full h-screen flex flex-col items-center justify-center relative">
+        <div className="absolute inset-0 overflow-hidden">
+          <Scanner
+            // FIX: Changed `onDecode` to `onResult` to match the updated API of the QR scanner library.
+            // The new prop provides a result object, so we extract the text before passing it to the handler.
+            onResult={(result) => handleScan(result.getText())}
+            onError={(error: any) => console.log(error?.message)}
+            containerStyle={{ width: '100%', height: '100%', paddingTop: 0 }}
+            videoStyle={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            paused={!!result}
+          />
         </div>
-      )}
+        <div className="absolute inset-0 bg-black/30"></div>
+        <div className="relative z-10 text-center p-4">
+          <h2 className="text-2xl font-bold">Escanear Código QR</h2>
+          <p className="text-gray-300">Apunta la cámara al código de la invitación.</p>
+           {isOffline && (
+              <div className="mt-4 bg-yellow-800/80 border border-yellow-600 text-white px-4 py-2 rounded-lg" role="status">
+                  <span className="font-semibold">Modo sin conexión</span>
+              </div>
+          )}
+        </div>
+        <div className="absolute z-10 bottom-8 text-center">
+            <button 
+                onClick={() => setShowManualInput(true)}
+                className="bg-indigo-600/80 backdrop-blur-sm hover:bg-indigo-500 text-white font-bold py-3 px-6 rounded-lg transition-colors"
+            >
+                Introducir ID Manualmente
+            </button>
+        </div>
+      </main>
 
-      <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 z-0 flex justify-center pointer-events-none">
-          <div className="w-64 h-64 border-4 border-white/50 rounded-2xl animate-pulse"></div>
-      </div>
-      
-      <div className="absolute inset-x-4 bottom-4 z-10">
-        {!showManualInput ? (
-          <button
-            onClick={() => setShowManualInput(true)}
-            className="w-full bg-indigo-600/80 hover:bg-indigo-600 text-white font-bold py-3 px-4 rounded-xl transition duration-300 backdrop-blur-sm"
-          >
-            Introducir ID Manualmente
-          </button>
-        ) : (
-          <form onSubmit={handleManualSubmit} className="bg-gray-800/80 p-4 rounded-xl backdrop-blur-sm">
-            <label htmlFor="manual-id" className="block text-sm font-medium text-gray-300 mb-2">
-              Introduce el ID del invitado
-            </label>
-            <div className="flex space-x-2">
+       {showManualInput && (
+        <div className="fixed inset-0 bg-black/80 z-40 flex items-center justify-center p-4">
+          <div className="bg-gray-800 p-8 rounded-2xl shadow-lg w-full max-w-sm">
+            <h3 className="text-xl font-bold mb-4">Introducir ID de Invitado</h3>
+            <form onSubmit={handleManualSubmit}>
               <input
-                id="manual-id"
                 type="text"
                 value={manualId}
                 onChange={(e) => setManualId(e.target.value.toUpperCase())}
-                autoCapitalize="characters"
-                placeholder="ABC123"
-                className="flex-grow bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                placeholder="Ej: A1B2C3"
                 autoFocus
+                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-md text-white text-center text-lg tracking-widest font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
-              <button
-                type="submit"
-                className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md transition duration-300"
-              >
-                Verificar
-              </button>
-            </div>
-            {manualError && <p className="text-red-400 text-sm mt-2">{manualError}</p>}
-            <button
-                type="button"
-                onClick={() => {
-                  setShowManualInput(false);
-                  setManualError('');
-                }}
-                className="w-full text-center text-gray-400 text-sm mt-3 hover:text-white"
-            >
-                Cancelar
-            </button>
-          </form>
-        )}
-      </div>
+              {manualError && <p className="text-red-400 text-sm mt-2">{manualError}</p>}
+              <div className="mt-6 flex gap-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                      setShowManualInput(false);
+                      setManualError('');
+                      setManualId('');
+                  }}
+                  className="w-full bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md transition-colors"
+                >
+                  Verificar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {renderResultScreen()}
     </div>
