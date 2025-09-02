@@ -26,13 +26,12 @@ const ProtectedRoute: React.FC<{
   requiredRole: string;
   children: React.ReactElement;
 }> = ({ session, requiredRole, children }) => {
-  // El componente App ahora maneja el estado de carga global, por lo que este componente
-  // solo se renderiza cuando la sesión ha sido verificada.
   if (!session.user) {
     return <Navigate to="/login" replace />;
   }
+  // Se actualiza la redirección en caso de rol no válido para que apunte a la ruta principal `/`.
   if (!session.roles.includes(requiredRole)) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/" replace />;
   }
   return children;
 };
@@ -71,8 +70,6 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
-  // Muestra un spinner de carga global mientras se verifica la sesión.
-  // Esto previene que las rutas se rendericen prematuramente y causen bucles de redirección.
   if (session.isLoading) {
     return <LoadingSpinner />;
   }
@@ -84,22 +81,39 @@ const App: React.FC = () => {
       <HashRouter>
         <div className="min-h-screen bg-gray-900 text-gray-100">
           <Routes>
-            <Route path="/login" element={session.user ? <Navigate to="/dashboard" /> : <LoginPage />} />
-            <Route path="/admin/login" element={<Navigate to="/login" />} />
-            
-            <Route path="/" element={session.user ? <Navigate to="/dashboard" /> : <LoginPage />} />
-            
+            {/* 
+              Ruta de Login: 
+              - Si el usuario NO está logueado, muestra la página de login.
+              - Si SÍ está logueado, redirige a /dashboard, que a su vez redirige a / para evitar ver el login de nuevo.
+            */}
+            <Route path="/login" element={session.user ? <Navigate to="/dashboard" replace /> : <LoginPage />} />
+
+            {/* 
+              Ruta Principal Protegida (/):
+              - Si el usuario está logueado, muestra el componente Dashboard.
+              - Si NO está logueado, lo redirige a /login.
+              Esta es ahora la ruta canónica para el dashboard.
+            */}
             <Route
-              path="/dashboard"
+              path="/"
               element={
                 session.user ? (
                   <Dashboard username={username} roles={session.roles} />
                 ) : (
-                  <Navigate to="/login" />
+                  <Navigate to="/login" replace />
                 )
               }
             />
 
+            {/* 
+              La ruta /dashboard ahora redirige a / para consolidar la URL del dashboard
+              y mantener la compatibilidad con redirecciones existentes desde el login.
+            */}
+            <Route path="/dashboard" element={<Navigate to="/" replace />} />
+
+            {/* Ruta de compatibilidad para el login de admin. */}
+            <Route path="/admin/login" element={<Navigate to="/login" replace />} />
+            
             <Route
               path="/organizer"
               element={
