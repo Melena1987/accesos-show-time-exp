@@ -32,13 +32,22 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
     }
   }, [isLoading, events, selectEvent, initialCheckDone]);
 
-  const processCheckInResult = (checkInResult: CheckInResult) => {
-      setResult(checkInResult);
-      setIsScanning(false);
-  };
-
   const handleScan = useCallback(async (decodedText: string) => {
-    if (!isScanning) return; // Prevent multiple scans while result is shown
+    let proceed = false;
+    
+    // Use functional update to prevent race conditions from multiple quick scans.
+    // This atomically checks and sets the scanning state.
+    setIsScanning(currentlyScanning => {
+      if (currentlyScanning) {
+        proceed = true;
+        return false; // Stop scanning
+      }
+      return false; // Already stopped
+    });
+
+    if (!proceed) {
+      return;
+    }
 
     let checkInResult: CheckInResult;
     try {
@@ -61,8 +70,8 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
       console.error("Invalid QR code format", e);
       checkInResult = { status: 'NOT_FOUND', guest: null };
     }
-    processCheckInResult(checkInResult);
-  }, [checkInGuest, guests, selectedEventId, events, isScanning]);
+    setResult(checkInResult);
+  }, [checkInGuest, guests, selectedEventId, events]);
 
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,6 +81,8 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
       return;
     }
     
+    setIsScanning(false);
+
     let checkInResult: CheckInResult;
     const guest = guests.find(g => g.id === manualId.toUpperCase().trim());
     if (guest && guest.eventId !== selectedEventId) {
@@ -84,7 +95,7 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
       checkInResult = await checkInGuest(manualId);
     }
     
-    processCheckInResult(checkInResult);
+    setResult(checkInResult);
     setManualId('');
     setShowManualInput(false);
   };
@@ -210,13 +221,14 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
 
   return (
     <div className="relative h-screen w-screen bg-black overflow-hidden">
-      {/* FIX: The `onResult` prop does not exist on the `Scanner` component. Changed to `onDecode` which is the correct prop for handling scan results as a string. */}
-      <Scanner
-        onDecode={handleScan}
-        onError={(error: any) => console.error(error?.message)}
-        containerStyle={{ width: '100%', height: '100%', paddingTop: 0 }}
-        videoStyle={{ width: '100%', height: '100%', objectFit: 'cover' }}
-      />
+      {isScanning && (
+        <Scanner
+          onDecode={handleScan}
+          onError={(error: any) => console.error(error?.message)}
+          containerStyle={{ width: '100%', height: '100%', paddingTop: 0 }}
+          videoStyle={{ width: '100%', height: '100%', objectFit: 'cover' }}
+        />
+      )}
       
       <div className="absolute inset-0 bg-black bg-opacity-30 pointer-events-none"></div>
 
@@ -275,7 +287,10 @@ const ControllerView: React.FC<ControllerViewProps> = ({ onLogout }) => {
             {manualError && <p className="text-red-400 text-sm mt-2">{manualError}</p>}
             <button
                 type="button"
-                onClick={() => setShowManualInput(false)}
+                onClick={() => {
+                  setShowManualInput(false);
+                  setManualError('');
+                }}
                 className="w-full text-center text-gray-400 text-sm mt-3 hover:text-white"
             >
                 Cancelar
