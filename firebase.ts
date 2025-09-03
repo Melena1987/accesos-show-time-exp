@@ -6,7 +6,7 @@ import "firebase/compat/auth";
 
 // Your web app's Firebase configuration provided by you
 const firebaseConfig = {
-  apiKey: "AIzaSyB2JIKv_iy-50cXPufRiLDFSRuoGxv07Q",
+  apiKey: "AIzaSyB2JIkV_iy-50cXPpUfRilDFSRuoGxv07Q",
   authDomain: "accesos-show-time-v2.firebaseapp.com",
   projectId: "accesos-show-time-v2",
   storageBucket: "accesos-show-time-v2.firebasestorage.app",
