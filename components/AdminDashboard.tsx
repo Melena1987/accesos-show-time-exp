@@ -1,12 +1,14 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useGuests } from '../hooks/useGuests';
 import { Event, Guest } from '../types';
 import DownloadIcon from './icons/DownloadIcon';
 import TrashIcon from './icons/TrashIcon';
-import { auth } from '../firebase';
+import HomeIcon from './icons/HomeIcon';
 
 const AdminDashboard: React.FC = () => {
   const { events, guests, isLoading, isOffline, error, clearError, deleteEvent } = useGuests();
+  const navigate = useNavigate();
 
   const handleExportToCSV = (event: Event, eventGuests: Guest[]) => {
     const headers = ["ID Invitado", "Nombre", "Empresa", "Nivel Acceso", "Invitado Por", "Hora Admisión"];
@@ -42,10 +44,11 @@ const AdminDashboard: React.FC = () => {
             <header className="flex justify-between items-center mb-8">
                 <h1 className="text-3xl font-bold">Panel de Administración</h1>
                  <button 
-                  onClick={() => auth.signOut()}
-                  className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md transition duration-300"
+                  onClick={() => navigate('/')}
+                  className="flex items-center space-x-2 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition duration-300"
                 >
-                  Cerrar Sesión
+                  <HomeIcon className="w-5 h-5" />
+                  <span>Menú Principal</span>
                 </button>
             </header>
             <div className="text-center bg-gray-800 p-10 rounded-lg">
@@ -74,10 +77,11 @@ const AdminDashboard: React.FC = () => {
       <header className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold">Panel de Administración</h1>
         <button 
-          onClick={() => auth.signOut()}
-          className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md transition duration-300"
+          onClick={() => navigate('/')}
+          className="flex items-center space-x-2 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition duration-300"
         >
-          Cerrar Sesión
+          <HomeIcon className="w-5 h-5" />
+          <span>Menú Principal</span>
         </button>
       </header>
       <main>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 // FIX: Import IDetectedBarcode to match the type expected by the onScan prop.
 import { Scanner, IDetectedBarcode } from '@yudiel/react-qr-scanner';
 import { useGuests } from '../hooks/useGuests';
@@ -6,7 +7,6 @@ import { CheckInResult, Guest } from '../types';
 import CheckIcon from './icons/CheckIcon';
 import WarningIcon from './icons/WarningIcon';
 import HomeIcon from './icons/HomeIcon';
-import { auth } from '../firebase';
 
 const ControllerView: React.FC = () => {
   const { checkInGuest, guests, events, selectedEventId, selectEvent, isLoading, isOffline, error } = useGuests();
@@ -16,6 +16,7 @@ const ControllerView: React.FC = () => {
   const [manualError, setManualError] = useState('');
   const [initialCheckDone, setInitialCheckDone] = useState(false);
   const isProcessing = useRef(false);
+  const navigate = useNavigate();
 
   const selectedEvent = events.find(e => e.id === selectedEventId);
 
@@ -122,7 +123,7 @@ const ControllerView: React.FC = () => {
                   <button onClick={() => window.location.reload()} className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md transition-colors">
                       Reintentar
                   </button>
-                  <button onClick={() => auth.signOut()} className="w-full sm:w-auto bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition-colors">
+                  <button onClick={() => navigate('/')} className="w-full sm:w-auto bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition-colors">
                       Menú Principal
                   </button>
                 </div>
@@ -136,7 +137,7 @@ const ControllerView: React.FC = () => {
         <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-4">
             <header className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center">
                 <h1 className="text-2xl font-bold">Control de Acceso</h1>
-                <button onClick={() => auth.signOut()} className="flex items-center space-x-2 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition duration-300">
+                <button onClick={() => navigate('/')} className="flex items-center space-x-2 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition duration-300">
                     <HomeIcon className="w-5 h-5" />
                     <span>Menú Principal</span>
                 </button>
@@ -241,7 +242,7 @@ const ControllerView: React.FC = () => {
           <h1 className="text-2xl font-bold">Control de Acceso</h1>
           <p className="text-gray-400 truncate max-w-[calc(100vw-220px)]">Evento: {selectedEvent?.name}</p>
         </div>
-        <button onClick={() => auth.signOut()} className="flex items-center space-x-2 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition duration-300">
+        <button onClick={() => navigate('/')} className="flex items-center space-x-2 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition duration-300">
             <HomeIcon className="w-5 h-5" />
             <span>Menú</span>
         </button>

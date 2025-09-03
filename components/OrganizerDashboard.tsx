@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toPng } from 'html-to-image';
 import { useGuests } from '../hooks/useGuests';
 import { Guest, AccessLevel } from '../types';
@@ -6,7 +7,6 @@ import Invitation from './Invitation';
 import QrCodeIcon from './icons/QrCodeIcon';
 import HomeIcon from './icons/HomeIcon';
 import TrashIcon from './icons/TrashIcon';
-import { auth } from '../firebase';
 
 interface OrganizerDashboardProps {
   loggedInUser: string;
@@ -196,6 +196,7 @@ const OrganizerDashboard: React.FC<OrganizerDashboardProps> = ({ loggedInUser })
   const { guests, events, selectedEventId, isLoading, isOffline, error, clearError, selectEvent, deleteGuest } = useGuests();
   const invitationRef = useRef<HTMLDivElement>(null);
   const [selectedGuest, setSelectedGuest] = useState<Guest | null>(null);
+  const navigate = useNavigate();
 
   const selectedEvent = events.find(e => e.id === selectedEventId);
 
@@ -244,7 +245,7 @@ const OrganizerDashboard: React.FC<OrganizerDashboardProps> = ({ loggedInUser })
                   <h1 className="text-3xl font-bold">Panel del Organizador</h1>
                   <p className="text-gray-400">Bienvenido, {loggedInUser}</p>
                 </div>
-                <button onClick={() => auth.signOut()} className="flex items-center space-x-2 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition duration-300">
+                <button onClick={() => navigate('/')} className="flex items-center space-x-2 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition duration-300">
                     <HomeIcon className="w-5 h-5" />
                     <span>Menú Principal</span>
                 </button>
@@ -279,7 +280,7 @@ const OrganizerDashboard: React.FC<OrganizerDashboardProps> = ({ loggedInUser })
               <h1 className="text-3xl font-bold">Panel del Organizador</h1>
               <p className="text-gray-400">Bienvenido, {loggedInUser}</p>
             </div>
-            <button onClick={() => auth.signOut()} className="flex items-center space-x-2 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition duration-300">
+            <button onClick={() => navigate('/')} className="flex items-center space-x-2 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-md transition duration-300">
                 <HomeIcon className="w-5 h-5" />
                 <span>Menú Principal</span>
             </button>
