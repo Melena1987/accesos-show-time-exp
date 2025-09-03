@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+// FIX: Using a namespace import for react-router-dom to fix module resolution errors.
+import * as ReactRouterDOM from 'react-router-dom';
+const { HashRouter, Routes, Route, Navigate } = ReactRouterDOM;
 import firebase from 'firebase/compat/app';
 import { GuestProvider } from './context/GuestContext';
 import LoginPage from './components/LoginPage';

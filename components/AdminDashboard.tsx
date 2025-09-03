@@ -1,5 +1,7 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+// FIX: Using a namespace import for react-router-dom to fix module resolution errors.
+import * as ReactRouterDOM from 'react-router-dom';
+const { useNavigate } = ReactRouterDOM;
 import { useGuests } from '../hooks/useGuests';
 import { Event, Guest } from '../types';
 import DownloadIcon from './icons/DownloadIcon';

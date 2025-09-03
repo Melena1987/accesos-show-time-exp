@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+// FIX: Using a namespace import for react-router-dom to fix module resolution errors.
+import * as ReactRouterDOM from 'react-router-dom';
+const { useNavigate, Link } = ReactRouterDOM;
 import { UserRole } from '../types';
 import { auth } from '../firebase';
 

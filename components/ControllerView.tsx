@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+// FIX: Using a namespace import for react-router-dom to fix module resolution errors.
+import * as ReactRouterDOM from 'react-router-dom';
+const { useNavigate } = ReactRouterDOM;
 // FIX: Import IDetectedBarcode to match the type expected by the onScan prop.
 import { Scanner, IDetectedBarcode } from '@yudiel/react-qr-scanner';
 import { useGuests } from '../hooks/useGuests';
