@@ -59,7 +59,10 @@ const LoginPage: React.FC = () => {
           <h1 className="text-center text-4xl font-bold text-white tracking-tight">
             ACCESOS SHOW TIME
           </h1>
-          <p className="mt-2 text-center text-sm text-gray-400">
+          <p className="mt-2 text-center text-sm font-medium tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-500">
+            by Manu
+          </p>
+          <p className="mt-6 text-center text-sm text-gray-400">
             Inicio de Sesión
           </p>
         </div>
